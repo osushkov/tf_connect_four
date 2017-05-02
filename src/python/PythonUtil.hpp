@@ -1,4 +1,5 @@
 
+#include "../util/Math.hpp"
 #include <boost/python.hpp>
 #include <boost/python/numpy.hpp>
 #include <iostream>
@@ -11,8 +12,6 @@ namespace bp = boost::python;
 namespace python {
 
 void Initialise(void);
-bp::object &GetLearnerModule(void);
-bp::object &GetModelModule(void);
 
 bp::object Import(const std::string &module, const std::string &path,
                   bp::object &globals);
@@ -25,7 +24,7 @@ inline std::vector<T> ToStdVector(const bp::object &iterable) {
                         bp::stl_input_iterator<T>());
 }
 
-np::ndarray ArrayFromVector(const std::vector<float> &data);
+np::ndarray EigenToNumpy(const EMatrix &emat);
 }
 
 std::ostream &operator<<(std::ostream &stream, const np::ndarray &array);

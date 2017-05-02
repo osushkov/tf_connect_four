@@ -2,96 +2,19 @@
 #include "PythonUtil.hpp"
 #include <boost/python.hpp>
 #include <boost/python/numpy.hpp>
-#include <boost/python/stl_iterator.hpp>
-#include <boost/python/suite/indexing/vector_indexing_suite.hpp>
 #include <mutex>
-#include <vector>
 
 using namespace std;
 
 static std::once_flag initialiseFlag;
-static bp::object learnerModule;
-static bp::object modelModule;
-
-class LearnerInstance {
-public:
-  LearnerInstance() = default;
-  virtual ~LearnerInstance() = default;
-
-  virtual void LearnIterations(unsigned iters) = 0;
-  virtual std::vector<np::ndarray> GetModelParams(void) = 0;
-};
-
-class PyLearnerInstance final : public LearnerInstance,
-                                public bp::wrapper<LearnerInstance> {
-public:
-  using LearnerInstance::LearnerInstance;
-
-  void LearnIterations(unsigned iters) override {
-    get_override("LearnIterations")(iters);
-  }
-
-  std::vector<np::ndarray> GetModelParams(void) override {
-    return get_override("GetModelParams")();
-  }
-};
-
-BOOST_PYTHON_MODULE(LearnerFramework) {
-  np::initialize();
-  bp::class_<PyLearnerInstance, boost::noncopyable>("LearnerInstance");
-}
-
-using ArrayList = vector<np::ndarray>;
-
-class ModelInstance {
-public:
-  virtual ~ModelInstance() = default;
-
-  virtual np::ndarray Inference(const np::ndarray &input) = 0;
-  virtual void SetModelParams(const vector<np::ndarray> &params) = 0;
-};
-
-class PyModelInstance final : public ModelInstance,
-                              public bp::wrapper<ModelInstance> {
-public:
-  using ModelInstance::ModelInstance;
-
-  np::ndarray Inference(const np::ndarray &input) {
-    return get_override("Inference")(input);
-  }
-
-  void SetModelParams(const vector<np::ndarray> &params) {
-    get_override("SetModelParams")(params);
-  }
-};
-
-BOOST_PYTHON_MODULE(ModelFramework) {
-  np::initialize();
-
-  bp::class_<ArrayList>("ArrayList")
-      .def(bp::vector_indexing_suite<ArrayList, true>());
-  bp::class_<PyModelInstance, boost::noncopyable>("ModelInstance");
-}
 
 void python::Initialise(void) {
   std::call_once(initialiseFlag, []() {
     Py_Initialize();
     PyEval_InitThreads();
     np::initialize();
-
-    PyImport_AppendInittab("LearnerFramework", &initLearnerFramework);
-    PyImport_AppendInittab("ModelFramework", &initModelFramework);
-
-    bp::object main = bp::import("__main__");
-    bp::object globals = main.attr("__dict__");
-    learnerModule =
-        python::Import("learner", "src/python/learner.py", globals);
-    modelModule = python::Import("model", "src/python/model.py", globals);
   });
 }
-
-bp::object &python::GetLearnerModule(void) { return learnerModule; }
-bp::object &python::GetModelModule(void) { return modelModule; }
 
 bp::object python::Import(const std::string &module,
                               const std::string &path, bp::object &globals) {
@@ -142,11 +65,11 @@ std::string python::ParseException(void) {
   return ret;
 }
 
-np::ndarray python::ArrayFromVector(const std::vector<float> &data) {
-  bp::tuple shape = bp::make_tuple(data.size());
-  bp::tuple stride = bp::make_tuple(sizeof(float));
+np::ndarray python::EigenToNumpy(const EMatrix &emat) {
+  bp::tuple shape = bp::make_tuple(emat.rows(), emat.cols());
+  bp::tuple stride = bp::make_tuple(emat.cols() * sizeof(float), sizeof(float));
 
-  return np::from_data(data.data(), np::dtype::get_builtin<float>(), shape,
+  return np::from_data(emat.data(), np::dtype::get_builtin<float>(), shape,
                        stride, bp::object());
 }
 

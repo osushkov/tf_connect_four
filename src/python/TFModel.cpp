@@ -35,6 +35,12 @@ public:
 
 BOOST_PYTHON_MODULE(ModelFramework) {
   np::initialize();
+
+  bp::class_<NetworkSpec>("NetworkSpec")
+      .def_readonly("numInputs", &NetworkSpec::numInputs)
+      .def_readonly("numOutputs", &NetworkSpec::numOutputs)
+      .def_readonly("maxBatchSize", &NetworkSpec::maxBatchSize);
+
   bp::class_<PyModelInstance, boost::noncopyable>("ModelInstance");
 }
 
