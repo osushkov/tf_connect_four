@@ -6,16 +6,18 @@ import tensorflow as tf
 
 class Model(ModelInstance):
 # class Model:
-    def __init__(self, batch_size):
-        self.batch_size = batch_size
+    def __init__(self, spec):
+        self.batch_size = spec.maxBatchSize
         self.sess = None
         self._buildGraph();
 
 
     def Inference(self, input):
-        self._initSession()
-        with self.sess.as_default():
-            return self.sess.run([self.output], feed_dict={self.input: input.reshape(1, self.batch_size)})[0]
+        print "bleeh: ", input
+        return np.array([1,2,3])
+        # self._initSession()
+        # with self.sess.as_default():
+        #     return self.sess.run([self.output], feed_dict={self.input: input.reshape(1, self.batch_size)})[0]
 
 
     def SetModelParams(self, params):

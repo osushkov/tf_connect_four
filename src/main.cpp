@@ -1,14 +1,17 @@
 
 #include "Evaluator.hpp"
 #include "Trainer.hpp"
-#include "util/Common.hpp"
 #include "connectfour/GameAction.hpp"
 #include "connectfour/GameRules.hpp"
 #include "connectfour/GameState.hpp"
 #include "learning/ExperienceMemory.hpp"
 #include "learning/LearningAgent.hpp"
 #include "learning/RandomAgent.hpp"
+#include "python/PythonUtil.hpp"
+#include "python/TFModel.hpp"
 #include "thirdparty/MinMaxAgent.hpp"
+#include "util/Common.hpp"
+#include "util/Math.hpp"
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
@@ -17,16 +20,29 @@
 using namespace learning;
 using namespace connectfour;
 
-static constexpr bool DO_TRAINING = true;
+static constexpr bool DO_TRAINING = false;
 static constexpr bool DO_EVALUATION = false;
 
-std::pair<float, float> evaluateAgent(learning::Agent *agent, learning::Agent *opponent) {
+std::pair<float, float> evaluateAgent(learning::Agent *agent,
+                                      learning::Agent *opponent) {
   Evaluator eval(1000);
   return eval.Evaluate(agent, opponent);
 }
 
 int main(int argc, char **argv) {
   srand(time(NULL));
+  python::Initialise();
+
+  python::NetworkSpec spec;
+  python::TFModel tfModel(spec);
+
+  EMatrix mat = Eigen::MatrixXf::Zero(5, 8);
+  mat(1, 1) = 5.0f;
+  mat(2, 3) = 6.0f;
+  mat(4, 1) = 7.0f;
+  mat(4, 7) = 2.5f;
+
+  tfModel.Inference(python::EigenToNumpy(mat));
 
   // Train an agent.
   if (DO_TRAINING) {
@@ -55,7 +71,7 @@ int main(int argc, char **argv) {
     });
 
     auto trainedAgent = trainer.TrainAgent(3000000);
-    
+
     std::ofstream saveFile("agent.dat");
     trainedAgent->Write(saveFile);
   }

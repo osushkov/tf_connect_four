@@ -10,6 +10,11 @@ struct NetworkSpec {
   unsigned numOutputs;
   unsigned maxBatchSize;
 
+  NetworkSpec() : numInputs(0), numOutputs(0), maxBatchSize(0) {}
+  NetworkSpec(unsigned numInputs, unsigned numOutputs, unsigned maxBatchSize)
+      : numInputs(numInputs), numOutputs(numOutputs),
+        maxBatchSize(maxBatchSize) {}
+
   inline void Write(std::ostream &out) {
     out << numInputs << std::endl;
     out << numOutputs << std::endl;
