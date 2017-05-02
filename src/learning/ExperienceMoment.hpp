@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../connectfour/GameState.hpp"
-#include "../math/Math.hpp"
+#include "../util/Math.hpp"
 #include <cstdlib>
 
 using namespace connectfour;

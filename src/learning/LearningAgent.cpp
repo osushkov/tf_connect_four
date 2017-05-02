@@ -1,10 +1,11 @@
 
 #include "LearningAgent.hpp"
-#include "../common/Common.hpp"
-#include "../common/Timer.hpp"
-#include "../common/Util.hpp"
-#include "../neuralnetwork/Network.hpp"
-#include "../neuralnetwork/NetworkSpec.hpp"
+#include "../util/Common.hpp"
+#include "../util/Timer.hpp"
+#include "../util/Math.hpp"
+// #include "../neuralnetwork/Network.hpp"
+// #include "../neuralnetwork/NetworkSpec.hpp"
+#include "../neuralnetwork/TrainingSample.hpp"
 #include "Constants.hpp"
 
 #include <boost/thread/shared_mutex.hpp>
@@ -19,21 +20,22 @@ struct LearningAgent::LearningAgentImpl {
   float pRandom;
   float temperature;
 
-  uptr<neuralnetwork::Network> learningNet;
-  uptr<neuralnetwork::Network> targetNet;
+  // uptr<neuralnetwork::Network> learningNet;
+  // uptr<neuralnetwork::Network> targetNet;
+
   unsigned itersSinceTargetUpdated = 0;
 
   LearningAgentImpl() : pRandom(0.0f), temperature(0.0001f) {
-    neuralnetwork::NetworkSpec spec;
-    spec.numInputs = BOARD_WIDTH * BOARD_HEIGHT * 2;
-    spec.numOutputs = GameAction::ALL_ACTIONS().size();
-    spec.hiddenLayers = {spec.numInputs * 2, spec.numInputs, spec.numInputs / 2};
-    spec.hiddenActivation = neuralnetwork::LayerActivation::LEAKY_RELU;
-    spec.outputActivation = neuralnetwork::LayerActivation::TANH;
-    spec.maxBatchSize = MOMENTS_BATCH_SIZE;
+    // neuralnetwork::NetworkSpec spec;
+    // spec.numInputs = BOARD_WIDTH * BOARD_HEIGHT * 2;
+    // spec.numOutputs = GameAction::ALL_ACTIONS().size();
+    // spec.hiddenLayers = {spec.numInputs * 2, spec.numInputs, spec.numInputs / 2};
+    // spec.hiddenActivation = neuralnetwork::LayerActivation::LEAKY_RELU;
+    // spec.outputActivation = neuralnetwork::LayerActivation::TANH;
+    // spec.maxBatchSize = MOMENTS_BATCH_SIZE;
 
-    learningNet = make_unique<neuralnetwork::Network>(spec);
-    targetNet = learningNet->RefreshAndGetTarget();
+    // learningNet = make_unique<neuralnetwork::Network>(spec);
+    // targetNet = learningNet->RefreshAndGetTarget();
     itersSinceTargetUpdated = 0;
   }
 
@@ -58,7 +60,7 @@ struct LearningAgent::LearningAgentImpl {
     assert(state != nullptr);
 
     boost::shared_lock<boost::shared_mutex> lock(rwMutex);
-    if (Util::RandInterval(0.0, 1.0) < pRandom) {
+    if (util::RandInterval(0.0, 1.0) < pRandom) {
       return chooseExplorativeAction(*state);
     } else {
       return chooseWeightedAction(*state, encodedState);
@@ -70,7 +72,7 @@ struct LearningAgent::LearningAgentImpl {
     if (itersSinceTargetUpdated > TARGET_FUNCTION_UPDATE_RATE) {
       boost::unique_lock<boost::shared_mutex> lock(rwMutex);
 
-      targetNet = learningNet->RefreshAndGetTarget();
+      // targetNet = learningNet->RefreshAndGetTarget();
       itersSinceTargetUpdated = 0;
     }
     itersSinceTargetUpdated++;
@@ -84,57 +86,30 @@ struct LearningAgent::LearningAgentImpl {
                                 moment.isSuccessorTerminal, moment.reward, REWARD_DELAY_DISCOUNT);
     }
 
-    learningNet->Update(neuralnetwork::SamplesProvider(learnSamples), learnRate);
+    // learningNet->Update(neuralnetwork::SamplesProvider(learnSamples), learnRate);
   }
 
   void Finalise(void) {
     // obtain a write lock
     boost::unique_lock<boost::shared_mutex> lock(rwMutex);
 
-    if (learningNet == nullptr) {
-      return;
-    }
-
-    targetNet = learningNet->RefreshAndGetTarget();
-    learningNet.release();
-    learningNet = nullptr;
+    // if (learningNet == nullptr) {
+    //   return;
+    // }
+    //
+    // targetNet = learningNet->RefreshAndGetTarget();
+    // learningNet.release();
+    // learningNet = nullptr;
   }
 
   float GetQValue(const GameState &state, const GameAction &action) const {
     auto encodedState = LearningAgent::EncodeGameState(&state);
-    EVector qvalues = targetNet->Process(encodedState);
+    EVector qvalues = Eigen::VectorXf::Zero(GameAction::ALL_ACTIONS().size()); //targetNet->Process(encodedState);
     return qvalues(GameAction::ACTION_INDEX(action));
   }
 
-  float RateGameState(const GameState &state) {
-    vector<float> actions = RateAvailableActions(state);
-    if (actions.empty()) {
-      assert(false);
-      return 0.0f;
-    }
-
-    float best = actions[0];
-    for (unsigned i = 1; i < actions.size(); i++) {
-      best = max(best, actions[i]);
-    }
-    return best;
-  }
-
-  vector<float> RateAvailableActions(const GameState &state) {
-    EVector encoded = LearningAgent::EncodeGameState(&state);
-    EVector qvalues = targetNet->Process(encoded);
-
-    std::vector<unsigned> availableActions = state.AvailableActions();
-
-    vector<float> result;
-    for (unsigned i = 0; i < availableActions.size(); i++) {
-      result.push_back(qvalues(availableActions[i]));
-    }
-    return result;
-  }
-
   GameAction chooseBestAction(const GameState &state, const EVector &encodedState) {
-    EVector qvalues = targetNet->Process(encodedState);
+    EVector qvalues = Eigen::VectorXf::Zero(GameAction::ALL_ACTIONS().size()); //targetNet->Process(encodedState);
     assert(qvalues.rows() == static_cast<int>(GameAction::ALL_ACTIONS().size()));
 
     std::vector<unsigned> availableActions = state.AvailableActions();
@@ -158,7 +133,7 @@ struct LearningAgent::LearningAgentImpl {
   }
 
   GameAction chooseWeightedAction(const GameState &state, const EVector &encodedState) {
-    EVector qv = targetNet->Process(encodedState);
+    EVector qv = Eigen::VectorXf::Zero(GameAction::ALL_ACTIONS().size()); //targetNet->Process(encodedState);
     assert(qv.rows() == static_cast<int>(GameAction::ALL_ACTIONS().size()));
 
     std::vector<unsigned> availableActions = state.AvailableActions();
@@ -167,9 +142,9 @@ struct LearningAgent::LearningAgentImpl {
     for (unsigned i = 0; i < availableActions.size(); i++) {
       weights.push_back(qv(availableActions[i]) / temperature);
     }
-    weights = Util::SoftmaxWeights(weights);
+    weights = util::SoftmaxWeights(weights);
 
-    float sample = Util::RandInterval(0.0, 1.0);
+    float sample = util::RandInterval(0.0, 1.0);
     for (unsigned i = 0; i < weights.size(); i++) {
       sample -= weights[i];
       if (sample <= 0.0f) {
@@ -213,13 +188,13 @@ LearningAgent::~LearningAgent() = default;
 
 uptr<LearningAgent> LearningAgent::Read(std::istream &in) {
   uptr<LearningAgent> result = make_unique<LearningAgent>();
-  result->impl->targetNet = neuralnetwork::Network::Read(in);
-  result->impl->learningNet.release();
-  result->impl->learningNet = nullptr;
+  // result->impl->targetNet = neuralnetwork::Network::Read(in);
+  // result->impl->learningNet.release();
+  // result->impl->learningNet = nullptr;
   return result;
 }
 
-void LearningAgent::Write(std::ostream &out) { impl->targetNet->Write(out); }
+void LearningAgent::Write(std::ostream &out) { /*impl->targetNet->Write(out);*/ }
 
 GameAction LearningAgent::SelectAction(const GameState *state) { return impl->SelectAction(state); }
 
@@ -239,10 +214,4 @@ void LearningAgent::Finalise(void) { impl->Finalise(); }
 
 float LearningAgent::GetQValue(const GameState &state, const GameAction &action) const {
   return impl->GetQValue(state, action);
-}
-
-float LearningAgent::RateGameState(const GameState &state) { return impl->RateGameState(state); }
-
-vector<float> LearningAgent::RateAvailableActions(const GameState &state) {
-  return impl->RateAvailableActions(state);
 }

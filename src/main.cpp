@@ -1,13 +1,12 @@
 
 #include "Evaluator.hpp"
 #include "Trainer.hpp"
-#include "common/Common.hpp"
+#include "util/Common.hpp"
 #include "connectfour/GameAction.hpp"
 #include "connectfour/GameRules.hpp"
 #include "connectfour/GameState.hpp"
 #include "learning/ExperienceMemory.hpp"
 #include "learning/LearningAgent.hpp"
-#include "learning/MCTSAgent.hpp"
 #include "learning/RandomAgent.hpp"
 #include "thirdparty/MinMaxAgent.hpp"
 #include <cstdlib>
@@ -61,12 +60,11 @@ int main(int argc, char **argv) {
   if (DO_EVALUATION) {
     std::ifstream saveFile("agent.dat");
     auto trainedAgent = learning::LearningAgent::Read(saveFile);
-    auto mctsAgent = make_unique<learning::MCTSAgent>(move(trainedAgent));
 
-    MinMaxAgent minmaxAgent(4);
+    // MinMaxAgent minmaxAgent(4);
     learning::RandomAgent baselineAgent;
     Evaluator eval(100);
-    auto r = eval.Evaluate(mctsAgent.get(), &minmaxAgent);
+    auto r = eval.Evaluate(trainedAgent.get(), &baselineAgent);
     // auto r = eval.Evaluate(&minmaxAgent, &baselineAgent);
     std::cout << "r : " << r.first << " / " << r.second << std::endl;
   }

@@ -2,10 +2,6 @@ include_rules
 : src/*.o \
 src/thirdparty/thirdparty.a \
 src/learning/learning.a \
-src/mcts/mcts.a \
-src/neuralnetwork/neuralnetwork.a \
-src/neuralnetwork/cuda/cuda.a \
 src/connectfour/connectfour.a \
-src/math/math.a \
-src/common/common.a \
-|> $(CC) $(CCFLAGS) %f -o %o $(CLFLAGS) |> dqn
+src/util/util.a \
+|> $(CC) $(CCFLAGS) %f -o %o $(CLFLAGS) |> tf_connect_four

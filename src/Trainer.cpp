@@ -1,7 +1,7 @@
 
 #include "Trainer.hpp"
-#include "common/Common.hpp"
-#include "common/Timer.hpp"
+#include "util/Common.hpp"
+#include "util/Timer.hpp"
 #include "connectfour/GameAction.hpp"
 #include "connectfour/GameRules.hpp"
 #include "connectfour/GameState.hpp"

@@ -1,6 +1,6 @@
 
 #include "IOAgent.hpp"
-#include "../common/Common.hpp"
+#include "../util/Common.hpp"
 #include "../connectfour/GameAction.hpp"
 #include "../connectfour/GameState.hpp"
 #include <algorithm>

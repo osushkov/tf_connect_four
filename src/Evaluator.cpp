@@ -1,8 +1,8 @@
 
 #include "Evaluator.hpp"
-#include "common/Common.hpp"
-#include "common/Timer.hpp"
-#include "common/Util.hpp"
+#include "util/Common.hpp"
+#include "util/Timer.hpp"
+#include "util/Math.hpp"
 #include "connectfour/GameAction.hpp"
 #include "connectfour/GameRules.hpp"
 #include "connectfour/GameState.hpp"
@@ -70,7 +70,7 @@ int Evaluator::runTrial(learning::Agent *primary, learning::Agent *opponent) {
     learning::Agent *curPlayer = agents[curPlayerIndex];
 
     GameAction action;
-    if (Util::RandInterval(0.0, 1.0) < 0.0) {
+    if (util::RandInterval(0.0, 1.0) < 0.0) {
       action = randomAgent.SelectAction(&curState);
     } else {
       Timer timer;

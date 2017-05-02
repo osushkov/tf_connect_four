@@ -1,12 +1,12 @@
 
-#include "Util.hpp"
+#include "Math.hpp"
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
 
-double Util::RandInterval(double s, double e) { return s + (e - s) * (rand() / (double)RAND_MAX); }
+double util::RandInterval(double s, double e) { return s + (e - s) * (rand() / (double)RAND_MAX); }
 
-double Util::GaussianSample(double mean, double sd) {
+double util::GaussianSample(double mean, double sd) {
   // Taken from GSL Library Gaussian random distribution.
   double x, y, r2;
 
@@ -23,7 +23,7 @@ double Util::GaussianSample(double mean, double sd) {
   return mean + sd * y * sqrt(-2.0 * log(r2) / r2);
 }
 
-std::vector<float> Util::SoftmaxWeights(const std::vector<float> &in) {
+std::vector<float> util::SoftmaxWeights(const std::vector<float> &in) {
   assert(in.size() > 0);
 
   std::vector<float> result(in.size());
@@ -46,7 +46,7 @@ std::vector<float> Util::SoftmaxWeights(const std::vector<float> &in) {
   return result;
 }
 
-float Util::SoftmaxWeightedAverage(const std::vector<float> &in, float temperature) {
+float util::SoftmaxWeightedAverage(const std::vector<float> &in, float temperature) {
   assert(temperature > 0.0f);
 
   std::vector<float> tempAdjusted(in.size());

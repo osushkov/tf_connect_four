@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/Common.hpp"
+#include "../util/Common.hpp"
 #include <boost/python/numpy.hpp>
 #include <vector>
 

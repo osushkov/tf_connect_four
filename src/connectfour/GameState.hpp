@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "../common/Common.hpp"
+#include "../util/Common.hpp"
 #include "CellState.hpp"
 #include "Constants.hpp"
 #include "GameAction.hpp"

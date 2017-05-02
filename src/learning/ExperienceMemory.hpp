@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../common/Common.hpp"
+#include "../util/Common.hpp"
 #include "ExperienceMoment.hpp"
 
 #include <boost/thread/shared_mutex.hpp>
