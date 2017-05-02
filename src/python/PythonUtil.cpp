@@ -73,7 +73,7 @@ BOOST_PYTHON_MODULE(ModelFramework) {
   bp::class_<PyModelInstance, boost::noncopyable>("ModelInstance");
 }
 
-void PythonUtil::Initialise(void) {
+void python::Initialise(void) {
   std::call_once(initialiseFlag, []() {
     Py_Initialize();
     PyEval_InitThreads();
@@ -85,15 +85,15 @@ void PythonUtil::Initialise(void) {
     bp::object main = bp::import("__main__");
     bp::object globals = main.attr("__dict__");
     learnerModule =
-        PythonUtil::Import("learner", "src/python/learner.py", globals);
-    modelModule = PythonUtil::Import("model", "src/python/model.py", globals);
+        python::Import("learner", "src/python/learner.py", globals);
+    modelModule = python::Import("model", "src/python/model.py", globals);
   });
 }
 
-bp::object &PythonUtil::GetLearnerModule(void) { return learnerModule; }
-bp::object &PythonUtil::GetModelModule(void) { return modelModule; }
+bp::object &python::GetLearnerModule(void) { return learnerModule; }
+bp::object &python::GetModelModule(void) { return modelModule; }
 
-bp::object PythonUtil::Import(const std::string &module,
+bp::object python::Import(const std::string &module,
                               const std::string &path, bp::object &globals) {
   bp::dict locals;
   locals["module_name"] = module;
@@ -108,7 +108,7 @@ bp::object PythonUtil::Import(const std::string &module,
   return locals["new_module"];
 }
 
-std::string PythonUtil::ParseException(void) {
+std::string python::ParseException(void) {
   PyObject *type = nullptr, *value = nullptr, *traceback = nullptr;
   PyErr_Fetch(&type, &value, &traceback);
   std::string ret("Unfetchable Python error");
@@ -142,7 +142,7 @@ std::string PythonUtil::ParseException(void) {
   return ret;
 }
 
-np::ndarray PythonUtil::ArrayFromVector(const std::vector<float> &data) {
+np::ndarray python::ArrayFromVector(const std::vector<float> &data) {
   bp::tuple shape = bp::make_tuple(data.size());
   bp::tuple stride = bp::make_tuple(sizeof(float));
 

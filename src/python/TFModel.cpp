@@ -2,29 +2,57 @@
 #include "PythonUtil.hpp"
 
 #include <boost/python.hpp>
-#include <boost/python/numeric.hpp>
 #include <boost/python/numpy.hpp>
-#include <boost/python/stl_iterator.hpp>
-#include <boost/python/suite/indexing/vector_indexing_suite.hpp>
 #include <cassert>
 #include <iostream>
-#include <mutex>
-#include <vector>
 
 namespace np = boost::python::numpy;
 namespace bp = boost::python;
 
+using namespace python;
+
+class ModelInstance {
+public:
+  virtual ~ModelInstance() = default;
+
+  virtual np::ndarray Inference(const np::ndarray &input) = 0;
+  virtual void SetModelParams(bp::object params) = 0;
+};
+
+class PyModelInstance final : public ModelInstance,
+                              public bp::wrapper<ModelInstance> {
+public:
+  using ModelInstance::ModelInstance;
+
+  np::ndarray Inference(const np::ndarray &input) {
+    return get_override("Inference")(input);
+  }
+
+  void SetModelParams(bp::object params) {
+    get_override("SetModelParams")(params);
+  }
+};
+
+BOOST_PYTHON_MODULE(ModelFramework) {
+  np::initialize();
+  bp::class_<PyModelInstance, boost::noncopyable>("ModelInstance");
+}
+
 struct TFModel::TFModelImpl {
   bp::object model;
 
-  TFModelImpl(unsigned batchSize) {
-    assert(batchSize >= 1);
-
+  TFModelImpl(const NetworkSpec &spec) {
     try {
-      bp::object Model = PythonUtil::GetModelModule().attr("Model");
-      model = Model(batchSize);
+      PyImport_AppendInittab("ModelFramework", &initModelFramework);
+
+      bp::object main = bp::import("__main__");
+      bp::object globals = main.attr("__dict__");
+      bp::object modelModule = python::Import("model", "python_src/model.py", globals);
+
+      bp::object Model = modelModule.attr("Model");
+      model = Model(spec);
     } catch (const bp::error_already_set &e) {
-      std::cerr << std::endl << PythonUtil::ParseException() << std::endl;
+      std::cerr << std::endl << python::ParseException() << std::endl;
       throw e;
     }
   }
@@ -33,28 +61,28 @@ struct TFModel::TFModelImpl {
     try {
       return bp::extract<np::ndarray>(model.attr("Inference")(input));
     } catch (const bp::error_already_set &e) {
-      std::cerr << std::endl << PythonUtil::ParseException() << std::endl;
+      std::cerr << std::endl << python::ParseException() << std::endl;
       throw e;
     }
   }
 
-  void SetModelParams(const vector<np::ndarray> &params) {
+  void SetModelParams(const bp::object &params) {
     try {
       model.attr("SetModelParams")(params);
     } catch (const bp::error_already_set &e) {
-      std::cerr << std::endl << PythonUtil::ParseException() << std::endl;
+      std::cerr << std::endl << python::ParseException() << std::endl;
       throw e;
     }
   }
 };
 
-TFModel::TFModel(unsigned batchSize) : impl(new TFModelImpl(batchSize)) {}
+TFModel::TFModel(const NetworkSpec &spec) : impl(new TFModelImpl(spec)) {}
 TFModel::~TFModel() = default;
 
 np::ndarray TFModel::Inference(const np::ndarray &input) {
   return impl->Inference(input);
 }
 
-void TFModel::SetModelParams(const vector<np::ndarray> &params) {
+void TFModel::SetModelParams(const bp::object &params) {
   impl->SetModelParams(params);
 }

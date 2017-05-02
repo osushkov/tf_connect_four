@@ -1,14 +1,18 @@
 #pragma once
 
 #include "../util/Common.hpp"
+#include "NetworkSpec.hpp"
 #include <boost/python/numpy.hpp>
 #include <vector>
 
 namespace np = boost::python::numpy;
+namespace bp = boost::python;
+
+namespace python {
 
 class TFLearner {
 public:
-  TFLearner();
+  TFLearner(const NetworkSpec &spec);
   virtual ~TFLearner();
 
   // noncopyable
@@ -16,9 +20,10 @@ public:
   TFLearner &operator=(TFLearner &other) = delete;
 
   void LearnIterations(unsigned iters);
-  vector<np::ndarray> GetModelParams(void);
+  bp::object GetModelParams(void);
 
 private:
   struct TFLearnerImpl;
   uptr<TFLearnerImpl> impl;
 };
+}

@@ -2,7 +2,7 @@
 
 #include "../util/Math.hpp"
 
-namespace neuralnetwork {
+namespace learning {
 
 struct TrainingSample {
   EVector startState;

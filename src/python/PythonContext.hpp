@@ -3,6 +3,8 @@
 #include <boost/python.hpp>
 #include <mutex>
 
+namespace python {
+
 struct PythonContext {
   PythonContext() : threadState(PyThreadState_Get()) { PyEval_ReleaseLock(); }
 
@@ -28,3 +30,4 @@ struct PythonContextLock {
 
   std::lock_guard<std::mutex> lock;
 };
+}

@@ -5,8 +5,8 @@
 #include "../util/Math.hpp"
 // #include "../neuralnetwork/Network.hpp"
 // #include "../neuralnetwork/NetworkSpec.hpp"
-#include "../neuralnetwork/TrainingSample.hpp"
 #include "Constants.hpp"
+#include "TrainingSample.hpp"
 
 #include <boost/thread/shared_mutex.hpp>
 #include <cassert>
@@ -63,8 +63,8 @@ struct LearningAgent::LearningAgentImpl {
     if (util::RandInterval(0.0, 1.0) < pRandom) {
       return chooseExplorativeAction(*state);
     } else {
-      return chooseWeightedAction(*state, encodedState);
-      // return chooseBestAction(*state, encodedState);
+      //return chooseWeightedAction(*state, encodedState);
+      return chooseBestAction(*state, encodedState);
     }
   }
 
@@ -77,7 +77,7 @@ struct LearningAgent::LearningAgentImpl {
     }
     itersSinceTargetUpdated++;
 
-    vector<neuralnetwork::TrainingSample> learnSamples;
+    vector<TrainingSample> learnSamples;
     learnSamples.reserve(moments.size());
 
     for (const auto &moment : moments) {

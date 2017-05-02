@@ -8,7 +8,7 @@
 namespace np = boost::python::numpy;
 namespace bp = boost::python;
 
-namespace PythonUtil {
+namespace python {
 
 void Initialise(void);
 bp::object &GetLearnerModule(void);
