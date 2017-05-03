@@ -16,8 +16,8 @@ void python::Initialise(void) {
   });
 }
 
-bp::object python::Import(const std::string &module,
-                              const std::string &path, bp::object &globals) {
+bp::object python::Import(const std::string &module, const std::string &path,
+                          bp::object &globals) {
   bp::dict locals;
   locals["module_name"] = module;
   locals["path"] = path;
@@ -65,12 +65,50 @@ std::string python::ParseException(void) {
   return ret;
 }
 
-np::ndarray python::EigenToNumpy(const EMatrix &emat) {
-  bp::tuple shape = bp::make_tuple(emat.rows(), emat.cols());
-  bp::tuple stride = bp::make_tuple(emat.cols() * sizeof(float), sizeof(float));
-
-  return np::from_data(emat.data(), np::dtype::get_builtin<float>(), shape,
+np::ndarray python::ToNumpy(const EMatrix &mat) {
+  bp::tuple shape = bp::make_tuple(mat.rows(), mat.cols());
+  bp::tuple stride = bp::make_tuple(mat.cols() * sizeof(float), sizeof(float));
+  return np::from_data(mat.data(), np::dtype::get_builtin<float>(), shape,
                        stride, bp::object());
+}
+
+np::ndarray python::ToNumpy(const EVector &vec) {
+  bp::tuple shape = bp::make_tuple(vec.rows());
+  bp::tuple stride = bp::make_tuple(sizeof(float));
+  return np::from_data(vec.data(), np::dtype::get_builtin<float>(), shape,
+                       stride, bp::object());
+}
+
+EVector python::ToEigen1D(const np::ndarray &arr) {
+  assert(arr.get_nd() == 1);
+
+  int rows = arr.shape(0);
+  int rowStride = arr.strides(0);
+
+  EVector result(rows);
+  for (int r = 0; r < rows; r++) {
+    result(r) = *(float *)(arr.get_data() + r * rowStride);
+  }
+  return result;
+}
+
+EMatrix python::ToEigen2D(const np::ndarray &arr) {
+  assert(arr.get_nd() == 2);
+
+  int rows = arr.shape(0);
+  int rowStride = arr.strides(0);
+
+  int cols = arr.shape(1);
+  int colStride = arr.strides(1);
+
+  EMatrix result(rows, cols);
+  for (int r = 0; r < rows; r++) {
+    for (int c = 0; c < cols; c++) {
+      result(r, c) = *(float *)(arr.get_data() + r * rowStride + c * colStride);
+    }
+  }
+
+  return result;
 }
 
 std::ostream &operator<<(std::ostream &stream, const np::ndarray &array) {

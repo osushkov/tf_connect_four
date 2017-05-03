@@ -23,6 +23,7 @@ def makeBatch(batch_size, data_x, data_y):
 batch_size = 1000
 
 class Learner(LearnerInstance):
+
     def __init__(self, networkSpec):
         self.sess = None
         self.data_x, self.data_y = createSampleData(10000)
@@ -47,7 +48,8 @@ class Learner(LearnerInstance):
 
 
     def Learn(self, batch):
-        pass
+        print "wooo", batch.initialStates
+        print "booo", batch.successorStates
 
     def UpdateTargetParams(self):
         pass
