@@ -23,8 +23,7 @@ def makeBatch(batch_size, data_x, data_y):
 batch_size = 1000
 
 class Learner(LearnerInstance):
-# class Learner:
-    def __init__(self):
+    def __init__(self, networkSpec):
         self.sess = None
         self.data_x, self.data_y = createSampleData(10000)
 
@@ -47,19 +46,11 @@ class Learner(LearnerInstance):
             self.init_op = tf.global_variables_initializer()
 
 
-    def LearnIterations(self, iters):
-        if self.sess is None:
-            self.sess = tf.Session(graph=self.graph)
-            self.sess.run(self.init_op)
+    def Learn(self, batch):
+        pass
 
-        with self.sess.as_default():
-            for i in range(iters):
-                batch_x, batch_y = makeBatch(batch_size, self.data_x, self.data_y)
-                _, l, a, b = self.sess.run([self.opt, self.loss, self.av, self.bv],
-                                           feed_dict={self.xv: batch_x, self.yv: batch_y})
-                self.total_iters += 1
-                # print("iter: " + str(self.total_iters) + " loss: " + str(l))
+    def UpdateTargetParams(self):
+        pass
 
-
-    def GetModelParams(self):
+    def QFunction(self, state):
         return [np.array([[5.0]]), np.array([[7.0]])]

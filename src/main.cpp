@@ -8,7 +8,7 @@
 #include "learning/LearningAgent.hpp"
 #include "learning/RandomAgent.hpp"
 #include "python/PythonUtil.hpp"
-#include "python/TFModel.hpp"
+#include "python/TFLearner.hpp"
 #include "thirdparty/MinMaxAgent.hpp"
 #include "util/Common.hpp"
 #include "util/Math.hpp"
@@ -34,15 +34,15 @@ int main(int argc, char **argv) {
   python::Initialise();
 
   python::NetworkSpec spec;
-  python::TFModel tfModel(spec);
+  python::TFLearner tfLearner(spec);
 
-  EMatrix mat = Eigen::MatrixXf::Zero(5, 8);
-  mat(1, 1) = 5.0f;
-  mat(2, 3) = 6.0f;
-  mat(4, 1) = 7.0f;
-  mat(4, 7) = 2.5f;
-
-  tfModel.Inference(python::EigenToNumpy(mat));
+  // EMatrix mat = Eigen::MatrixXf::Zero(5, 8);
+  // mat(1, 1) = 5.0f;
+  // mat(2, 3) = 6.0f;
+  // mat(4, 1) = 7.0f;
+  // mat(4, 7) = 2.5f;
+  //
+  // tfModel.Inference(python::EigenToNumpy(mat));
 
   // Train an agent.
   if (DO_TRAINING) {
