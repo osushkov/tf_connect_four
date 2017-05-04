@@ -34,7 +34,7 @@ public:
   void Finalise(void);
 
   // This is for debugging.
-  float GetQValue(const GameState &state, const GameAction &action) const;
+  float GetQValue(const GameState &state, const GameAction &action);
 
 private:
   struct LearningAgentImpl;

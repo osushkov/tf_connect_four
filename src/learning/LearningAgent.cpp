@@ -1,10 +1,12 @@
 
 #include "LearningAgent.hpp"
 #include "../util/Common.hpp"
-#include "../util/Timer.hpp"
 #include "../util/Math.hpp"
-// #include "../neuralnetwork/Network.hpp"
-// #include "../neuralnetwork/NetworkSpec.hpp"
+#include "../util/Timer.hpp"
+#include "../python/PythonContext.hpp"
+#include "../python/PythonUtil.hpp"
+#include "../python/NetworkSpec.hpp"
+#include "../python/TFLearner.hpp"
 #include "Constants.hpp"
 #include "TrainingSample.hpp"
 
@@ -20,22 +22,17 @@ struct LearningAgent::LearningAgentImpl {
   float pRandom;
   float temperature;
 
-  // uptr<neuralnetwork::Network> learningNet;
-  // uptr<neuralnetwork::Network> targetNet;
+  python::PythonThreadContext ptctx;
+  uptr<python::TFLearner> learner;
 
   unsigned itersSinceTargetUpdated = 0;
 
-  LearningAgentImpl() : pRandom(0.0f), temperature(0.0001f) {
-    // neuralnetwork::NetworkSpec spec;
-    // spec.numInputs = BOARD_WIDTH * BOARD_HEIGHT * 2;
-    // spec.numOutputs = GameAction::ALL_ACTIONS().size();
-    // spec.hiddenLayers = {spec.numInputs * 2, spec.numInputs, spec.numInputs / 2};
-    // spec.hiddenActivation = neuralnetwork::LayerActivation::LEAKY_RELU;
-    // spec.outputActivation = neuralnetwork::LayerActivation::TANH;
-    // spec.maxBatchSize = MOMENTS_BATCH_SIZE;
+  LearningAgentImpl() : pRandom(0.0f), temperature(0.0001f), ptctx(python::GlobalContext()) {
+    python::NetworkSpec spec(BOARD_WIDTH * BOARD_HEIGHT * 2,
+                             GameAction::ALL_ACTIONS().size(),
+                             MOMENTS_BATCH_SIZE);
 
-    // learningNet = make_unique<neuralnetwork::Network>(spec);
-    // targetNet = learningNet->RefreshAndGetTarget();
+    learner = make_unique<python::TFLearner>(ptctx, spec);
     itersSinceTargetUpdated = 0;
   }
 
@@ -56,14 +53,15 @@ struct LearningAgent::LearningAgentImpl {
     this->temperature = temperature;
   }
 
-  GameAction SelectLearningAction(const GameState *state, const EVector &encodedState) {
+  GameAction SelectLearningAction(const GameState *state,
+                                  const EVector &encodedState) {
     assert(state != nullptr);
 
     boost::shared_lock<boost::shared_mutex> lock(rwMutex);
     if (util::RandInterval(0.0, 1.0) < pRandom) {
       return chooseExplorativeAction(*state);
     } else {
-      //return chooseWeightedAction(*state, encodedState);
+      // return chooseWeightedAction(*state, encodedState);
       return chooseBestAction(*state, encodedState);
     }
   }
@@ -71,8 +69,7 @@ struct LearningAgent::LearningAgentImpl {
   void Learn(const vector<ExperienceMoment> &moments, float learnRate) {
     if (itersSinceTargetUpdated > TARGET_FUNCTION_UPDATE_RATE) {
       boost::unique_lock<boost::shared_mutex> lock(rwMutex);
-
-      // targetNet = learningNet->RefreshAndGetTarget();
+      learner->UpdateTargetParams(ptctx);
       itersSinceTargetUpdated = 0;
     }
     itersSinceTargetUpdated++;
@@ -83,10 +80,12 @@ struct LearningAgent::LearningAgentImpl {
     for (const auto &moment : moments) {
       learnSamples.emplace_back(moment.initialState, moment.successorState,
                                 GameAction::ACTION_INDEX(moment.actionTaken),
-                                moment.isSuccessorTerminal, moment.reward, REWARD_DELAY_DISCOUNT);
+                                moment.isSuccessorTerminal, moment.reward,
+                                REWARD_DELAY_DISCOUNT);
     }
 
-    // learningNet->Update(neuralnetwork::SamplesProvider(learnSamples), learnRate);
+    // learningNet->Update(neuralnetwork::SamplesProvider(learnSamples),
+    // learnRate);
   }
 
   void Finalise(void) {
@@ -102,25 +101,24 @@ struct LearningAgent::LearningAgentImpl {
     // learningNet = nullptr;
   }
 
-  float GetQValue(const GameState &state, const GameAction &action) const {
-    auto encodedState = LearningAgent::EncodeGameState(&state);
-    EVector qvalues = Eigen::VectorXf::Zero(GameAction::ALL_ACTIONS().size()); //targetNet->Process(encodedState);
-    return qvalues(GameAction::ACTION_INDEX(action));
+  // TODO: probably dont need this.
+  float GetQValue(const GameState &state, const GameAction &action) {
+    EMatrix qvalues = learnerInference(LearningAgent::EncodeGameState(&state));
+    return qvalues(GameAction::ACTION_INDEX(action), 0);
   }
 
-  GameAction chooseBestAction(const GameState &state, const EVector &encodedState) {
-    EVector qvalues = Eigen::VectorXf::Zero(GameAction::ALL_ACTIONS().size()); //targetNet->Process(encodedState);
-    assert(qvalues.rows() == static_cast<int>(GameAction::ALL_ACTIONS().size()));
-
+  GameAction chooseBestAction(const GameState &state,
+                              const EVector &encodedState) {
+    EMatrix qvalues = learnerInference(encodedState);
     std::vector<unsigned> availableActions = state.AvailableActions();
     assert(availableActions.size() > 0);
 
     GameAction bestAction = GameAction::ACTION(availableActions[0]);
-    float bestQValue = qvalues(availableActions[0]);
+    float bestQValue = qvalues(availableActions[0], 0);
 
     for (unsigned i = 1; i < availableActions.size(); i++) {
       if (qvalues(availableActions[i]) > bestQValue) {
-        bestQValue = qvalues(availableActions[i]);
+        bestQValue = qvalues(availableActions[i], 0);
         bestAction = GameAction::ACTION(availableActions[i]);
       }
     }
@@ -132,15 +130,15 @@ struct LearningAgent::LearningAgentImpl {
     return GameAction::ACTION(aa[rand() % aa.size()]);
   }
 
-  GameAction chooseWeightedAction(const GameState &state, const EVector &encodedState) {
-    EVector qv = Eigen::VectorXf::Zero(GameAction::ALL_ACTIONS().size()); //targetNet->Process(encodedState);
-    assert(qv.rows() == static_cast<int>(GameAction::ALL_ACTIONS().size()));
+  GameAction chooseWeightedAction(const GameState &state,
+                                  const EVector &encodedState) {
+    EMatrix qvalues = learnerInference(encodedState);
 
     std::vector<unsigned> availableActions = state.AvailableActions();
     std::vector<float> weights;
 
     for (unsigned i = 0; i < availableActions.size(); i++) {
-      weights.push_back(qv(availableActions[i]) / temperature);
+      weights.push_back(qvalues(availableActions[i], 0) / temperature);
     }
     weights = util::SoftmaxWeights(weights);
 
@@ -154,6 +152,13 @@ struct LearningAgent::LearningAgentImpl {
     }
 
     return chooseExplorativeAction(state);
+  }
+
+  EMatrix learnerInference(const EVector &encodedState) {
+    EMatrix qvalues = python::ToEigen2D(learner->QFunction(ptctx, python::ToNumpy(encodedState)));
+    assert(qvalues.rows() == static_cast<int>(GameAction::ALL_ACTIONS().size()));
+    assert(qvalues.cols() == 1);
+    return qvalues;
   }
 };
 
@@ -194,24 +199,31 @@ uptr<LearningAgent> LearningAgent::Read(std::istream &in) {
   return result;
 }
 
-void LearningAgent::Write(std::ostream &out) { /*impl->targetNet->Write(out);*/ }
+void LearningAgent::Write(std::ostream &out) { /*impl->targetNet->Write(out);*/
+}
 
-GameAction LearningAgent::SelectAction(const GameState *state) { return impl->SelectAction(state); }
+GameAction LearningAgent::SelectAction(const GameState *state) {
+  return impl->SelectAction(state);
+}
 
 void LearningAgent::SetPRandom(float pRandom) { impl->SetPRandom(pRandom); }
-void LearningAgent::SetTemperature(float temperature) { impl->SetTemperature(temperature); }
+void LearningAgent::SetTemperature(float temperature) {
+  impl->SetTemperature(temperature);
+}
 
 GameAction LearningAgent::SelectLearningAction(const GameState *state,
                                                const EVector &encodedState) {
   return impl->SelectLearningAction(state, encodedState);
 }
 
-void LearningAgent::Learn(const vector<ExperienceMoment> &moments, float learnRate) {
+void LearningAgent::Learn(const vector<ExperienceMoment> &moments,
+                          float learnRate) {
   impl->Learn(moments, learnRate);
 }
 
 void LearningAgent::Finalise(void) { impl->Finalise(); }
 
-float LearningAgent::GetQValue(const GameState &state, const GameAction &action) const {
+float LearningAgent::GetQValue(const GameState &state,
+                               const GameAction &action) {
   return impl->GetQValue(state, action);
 }

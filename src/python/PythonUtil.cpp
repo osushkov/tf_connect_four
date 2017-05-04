@@ -1,4 +1,5 @@
 
+#include "../util/Common.hpp"
 #include "PythonUtil.hpp"
 #include <boost/python.hpp>
 #include <boost/python/numpy.hpp>
@@ -7,12 +8,19 @@
 using namespace std;
 
 static std::once_flag initialiseFlag;
+static uptr<python::PythonMainContext> globalContext;
+
+python::PythonMainContext& python::GlobalContext(void) {
+  return *globalContext;
+}
 
 void python::Initialise(void) {
   std::call_once(initialiseFlag, []() {
     Py_Initialize();
     PyEval_InitThreads();
     np::initialize();
+
+    globalContext = make_unique<PythonMainContext>();
   });
 }
 
@@ -69,14 +77,14 @@ np::ndarray python::ToNumpy(const EMatrix &mat) {
   bp::tuple shape = bp::make_tuple(mat.rows(), mat.cols());
   bp::tuple stride = bp::make_tuple(mat.cols() * sizeof(float), sizeof(float));
   return np::from_data(mat.data(), np::dtype::get_builtin<float>(), shape,
-                       stride, bp::object());
+                       stride, bp::object()).copy();
 }
 
 np::ndarray python::ToNumpy(const EVector &vec) {
   bp::tuple shape = bp::make_tuple(vec.rows());
   bp::tuple stride = bp::make_tuple(sizeof(float));
   return np::from_data(vec.data(), np::dtype::get_builtin<float>(), shape,
-                       stride, bp::object());
+                       stride, bp::object()).copy();
 }
 
 EVector python::ToEigen1D(const np::ndarray &arr) {

@@ -49,10 +49,11 @@ BOOST_PYTHON_MODULE(LearnerFramework) {
   bp::class_<QLearnBatch>("QLearnBatch")
       .def_readonly("initialStates", &QLearnBatch::initialStates)
       .def_readonly("successorStates", &QLearnBatch::successorStates)
-      // .def_readonly("actionsTaken", &QLearnBatch::actionsTaken)
-      // .def_readonly("isEndStateTerminal", &QLearnBatch::isEndStateTerminal)
-      // .def_readonly("rewardsGained", &QLearnBatch::rewardsGained)
-      .def_readonly("futureRewardDiscount", &QLearnBatch::futureRewardDiscount);
+      .def_readonly("actionsTaken", &QLearnBatch::actionsTaken)
+      .def_readonly("isEndStateTerminal", &QLearnBatch::isEndStateTerminal)
+      .def_readonly("rewardsGained", &QLearnBatch::rewardsGained)
+      .def_readonly("futureRewardDiscount", &QLearnBatch::futureRewardDiscount)
+      .def_readonly("learnRate", &QLearnBatch::learnRate);
 
   bp::class_<PyLearnerInstance, boost::noncopyable>("LearnerInstance");
 }
@@ -105,17 +106,24 @@ struct TFLearner::TFLearnerImpl {
   }
 };
 
-TFLearner::TFLearner(const NetworkSpec &spec) : impl(new TFLearnerImpl(spec)) {}
+TFLearner::TFLearner(PythonThreadContext &ctx, const NetworkSpec &spec) {
+  PythonContextLock pl(ctx);
+  impl = make_unique<TFLearnerImpl>(spec);
+}
+
 TFLearner::~TFLearner() = default;
 
-void TFLearner::Learn(const QLearnBatch &batch) {
+void TFLearner::Learn(PythonThreadContext &ctx, const QLearnBatch &batch) {
+  PythonContextLock pl(ctx);
   impl->Learn(batch);
 }
 
-void TFLearner::UpdateTargetParams(void) {
+void TFLearner::UpdateTargetParams(PythonThreadContext &ctx) {
+  PythonContextLock pl(ctx);
   impl->UpdateTargetParams();
 }
 
-np::ndarray TFLearner::QFunction(const np::ndarray &state) {
+np::ndarray TFLearner::QFunction(PythonThreadContext &ctx, const np::ndarray &state) {
+  PythonContextLock pl(ctx);
   return impl->QFunction(state);
 }

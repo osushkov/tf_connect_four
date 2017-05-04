@@ -33,8 +33,8 @@ int main(int argc, char **argv) {
   srand(time(NULL));
   python::Initialise();
 
-  python::NetworkSpec spec;
-  python::TFLearner tfLearner(spec);
+  // python::NetworkSpec spec;
+  // python::TFLearner tfLearner(spec);
 
   EMatrix mat = Eigen::MatrixXf::Zero(5, 8);
   mat(1, 1) = 5.0f;
@@ -46,6 +46,9 @@ int main(int argc, char **argv) {
   EMatrix cmat = python::ToEigen2D(py_arr);
   std::cout << "orig: " << mat << std::endl;
   std::cout << "conv: " << cmat << std::endl;
+
+  vector<bool> blah{true, false, true, true, false};
+  std::cout << python::ToNumpy(blah) << std::endl;
 
   // tfLearner.Learn(python::QLearnBatch(python::EigenToNumpy(mat),
   //                                     python::EigenToNumpy(mat)));
