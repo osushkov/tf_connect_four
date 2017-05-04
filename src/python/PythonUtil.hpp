@@ -1,6 +1,6 @@
 
-#include "PythonContext.hpp"
 #include "../util/Math.hpp"
+#include "PythonContext.hpp"
 #include <boost/python.hpp>
 #include <boost/python/numpy.hpp>
 #include <iostream>
@@ -13,7 +13,7 @@ namespace bp = boost::python;
 
 namespace python {
 
-PythonMainContext& GlobalContext(void);
+PythonMainContext &GlobalContext(void);
 void Initialise(void);
 
 bp::object Import(const std::string &module, const std::string &path,
@@ -30,16 +30,15 @@ inline std::vector<T> ToStdVector(const bp::object &iterable) {
 np::ndarray ToNumpy(const EMatrix &mat);
 np::ndarray ToNumpy(const EVector &vec);
 
-template <typename T>
-inline np::ndarray ToNumpy(const std::vector<T> &vec) {
+template <typename T> inline np::ndarray ToNumpy(const std::vector<T> &vec) {
   bp::tuple shape = bp::make_tuple(vec.size());
   bp::tuple stride = bp::make_tuple(sizeof(T));
-  return np::from_data(vec.data(), np::dtype::get_builtin<T>(), shape,
-                       stride, bp::object()).copy();
+  return np::from_data(vec.data(), np::dtype::get_builtin<T>(), shape, stride,
+                       bp::object())
+      .copy();
 }
 
-template <>
-inline np::ndarray ToNumpy(const std::vector<bool> &vec) {
+template <> inline np::ndarray ToNumpy(const std::vector<bool> &vec) {
   bp::tuple shape = bp::make_tuple(vec.size());
   bp::tuple stride = bp::make_tuple(sizeof(bool));
 
@@ -49,8 +48,9 @@ inline np::ndarray ToNumpy(const std::vector<bool> &vec) {
     normData[i] = vec[i];
   }
 
-  np::ndarray result = np::from_data(normData, np::dtype::get_builtin<bool>(), shape,
-                       stride, bp::object()).copy();
+  np::ndarray result = np::from_data(normData, np::dtype::get_builtin<bool>(),
+                                     shape, stride, bp::object())
+                           .copy();
   delete[] normData;
   return result;
 }

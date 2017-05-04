@@ -4,30 +4,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
-def createSampleData(samples):
-    a = 10.0;
-    b = -5.0;
-    noise_sd = 0.1
-
-    xs = np.random.rand(1, samples) * 1.0
-    ys = xs * a + b + np.random.normal(0.0, noise_sd, samples)
-
-    return xs, ys
-
-
-def makeBatch(batch_size, data_x, data_y):
-    indices = np.random.permutation(data_x.shape[1])[:batch_size]
-    return data_x[:,indices], data_y[:,indices]
-
-
 batch_size = 1000
 
 class Learner(LearnerInstance):
 
     def __init__(self, networkSpec):
-        self.sess = None
-        self.data_x, self.data_y = createSampleData(10000)
+        self.num_inputs = networkSpec.numInputs
+        self.num_outputs = networkSpec.numOutputs
+        self.max_batch_size = networkSpec.maxBatchSize
 
+        self.sess = None
         self._buildGraph()
 
     def _buildGraph(self):
@@ -55,4 +41,5 @@ class Learner(LearnerInstance):
         pass
 
     def QFunction(self, state):
-        return [np.array([[5.0]]), np.array([[7.0]])]
+        # print "qfunction: ", state
+        return np.random.rand(self.num_outputs, 1)

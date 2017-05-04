@@ -1,6 +1,6 @@
 
-#include "../util/Common.hpp"
 #include "PythonUtil.hpp"
+#include "../util/Common.hpp"
 #include <boost/python.hpp>
 #include <boost/python/numpy.hpp>
 #include <mutex>
@@ -10,7 +10,7 @@ using namespace std;
 static std::once_flag initialiseFlag;
 static uptr<python::PythonMainContext> globalContext;
 
-python::PythonMainContext& python::GlobalContext(void) {
+python::PythonMainContext &python::GlobalContext(void) {
   return *globalContext;
 }
 
@@ -77,14 +77,16 @@ np::ndarray python::ToNumpy(const EMatrix &mat) {
   bp::tuple shape = bp::make_tuple(mat.rows(), mat.cols());
   bp::tuple stride = bp::make_tuple(mat.cols() * sizeof(float), sizeof(float));
   return np::from_data(mat.data(), np::dtype::get_builtin<float>(), shape,
-                       stride, bp::object()).copy();
+                       stride, bp::object())
+      .copy();
 }
 
 np::ndarray python::ToNumpy(const EVector &vec) {
   bp::tuple shape = bp::make_tuple(vec.rows());
   bp::tuple stride = bp::make_tuple(sizeof(float));
   return np::from_data(vec.data(), np::dtype::get_builtin<float>(), shape,
-                       stride, bp::object()).copy();
+                       stride, bp::object())
+      .copy();
 }
 
 EVector python::ToEigen1D(const np::ndarray &arr) {
@@ -101,6 +103,7 @@ EVector python::ToEigen1D(const np::ndarray &arr) {
 }
 
 EMatrix python::ToEigen2D(const np::ndarray &arr) {
+  std::cout << "---" << std::endl;
   assert(arr.get_nd() == 2);
 
   int rows = arr.shape(0);
@@ -116,6 +119,7 @@ EMatrix python::ToEigen2D(const np::ndarray &arr) {
     }
   }
 
+  std::cout << "+++" << std::endl;
   return result;
 }
 

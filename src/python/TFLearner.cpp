@@ -106,24 +106,16 @@ struct TFLearner::TFLearnerImpl {
   }
 };
 
-TFLearner::TFLearner(PythonThreadContext &ctx, const NetworkSpec &spec) {
-  PythonContextLock pl(ctx);
+TFLearner::TFLearner(const NetworkSpec &spec) {
   impl = make_unique<TFLearnerImpl>(spec);
 }
 
 TFLearner::~TFLearner() = default;
 
-void TFLearner::Learn(PythonThreadContext &ctx, const QLearnBatch &batch) {
-  PythonContextLock pl(ctx);
-  impl->Learn(batch);
-}
+void TFLearner::Learn(const QLearnBatch &batch) { impl->Learn(batch); }
 
-void TFLearner::UpdateTargetParams(PythonThreadContext &ctx) {
-  PythonContextLock pl(ctx);
-  impl->UpdateTargetParams();
-}
+void TFLearner::UpdateTargetParams(void) { impl->UpdateTargetParams(); }
 
-np::ndarray TFLearner::QFunction(PythonThreadContext &ctx, const np::ndarray &state) {
-  PythonContextLock pl(ctx);
+np::ndarray TFLearner::QFunction(const np::ndarray &state) {
   return impl->QFunction(state);
 }

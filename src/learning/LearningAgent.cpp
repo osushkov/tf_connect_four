@@ -1,12 +1,12 @@
 
 #include "LearningAgent.hpp"
+#include "../python/NetworkSpec.hpp"
+#include "../python/PythonContext.hpp"
+#include "../python/PythonUtil.hpp"
+#include "../python/TFLearner.hpp"
 #include "../util/Common.hpp"
 #include "../util/Math.hpp"
 #include "../util/Timer.hpp"
-#include "../python/PythonContext.hpp"
-#include "../python/PythonUtil.hpp"
-#include "../python/NetworkSpec.hpp"
-#include "../python/TFLearner.hpp"
 #include "Constants.hpp"
 #include "TrainingSample.hpp"
 
@@ -23,28 +23,21 @@ struct LearningAgent::LearningAgentImpl {
 
   unsigned itersSinceTargetUpdated = 0;
 
-  LearningAgentImpl() : pRandom(0.0f), temperature(0.0001f), ptctx(python::GlobalContext()) {
+  LearningAgentImpl()
+      : pRandom(0.0f), temperature(0.0001f), ptctx(python::GlobalContext()) {
+    python::PythonContextLock pl(ptctx);
+
     python::NetworkSpec spec(BOARD_WIDTH * BOARD_HEIGHT * 2,
                              GameAction::ALL_ACTIONS().size(),
                              MOMENTS_BATCH_SIZE);
 
-    learner = make_unique<python::TFLearner>(ptctx, spec);
+    learner = make_unique<python::TFLearner>(spec);
     itersSinceTargetUpdated = 0;
   }
 
   GameAction SelectAction(const GameState *state) {
     assert(state != nullptr);
     return chooseBestAction(*state, LearningAgent::EncodeGameState(state));
-  }
-
-  void SetPRandom(float pRandom) {
-    assert(pRandom >= 0.0f && pRandom <= 1.0f);
-    this->pRandom = pRandom;
-  }
-
-  void SetTemperature(float temperature) {
-    assert(temperature > 0.0f);
-    this->temperature = temperature;
   }
 
   GameAction SelectLearningAction(const GameState *state,
@@ -61,10 +54,10 @@ struct LearningAgent::LearningAgentImpl {
 
   void Learn(const vector<ExperienceMoment> &moments, float learnRate) {
     if (itersSinceTargetUpdated > TARGET_FUNCTION_UPDATE_RATE) {
-      learner->UpdateTargetParams(ptctx);
+      learner->UpdateTargetParams();
       itersSinceTargetUpdated = 0;
     }
-    learner->Learn(ptctx, makeQBatch(moments, learnRate));
+    learner->Learn(makeQBatch(moments, learnRate));
     itersSinceTargetUpdated++;
   }
 
@@ -84,7 +77,8 @@ struct LearningAgent::LearningAgentImpl {
     return qvalues(GameAction::ACTION_INDEX(action), 0);
   }
 
-  python::QLearnBatch makeQBatch(const vector<ExperienceMoment> &moments, float learnRate) {
+  python::QLearnBatch makeQBatch(const vector<ExperienceMoment> &moments,
+                                 float learnRate) {
     EMatrix initialStates(BOARD_WIDTH * BOARD_HEIGHT * 2, moments.size());
     EMatrix successorStates(BOARD_WIDTH * BOARD_HEIGHT * 2, moments.size());
     std::vector<int> actionsTaken(moments.size());
@@ -153,9 +147,13 @@ struct LearningAgent::LearningAgentImpl {
   }
 
   EMatrix learnerInference(const EVector &encodedState) {
-    EMatrix qvalues = python::ToEigen2D(learner->QFunction(ptctx, python::ToNumpy(encodedState)));
-    assert(qvalues.rows() == static_cast<int>(GameAction::ALL_ACTIONS().size()));
+    EMatrix qvalues =
+        python::ToEigen2D(learner->QFunction(python::ToNumpy(encodedState)));
+
+    assert(qvalues.rows() ==
+           static_cast<int>(GameAction::ALL_ACTIONS().size()));
     assert(qvalues.cols() == 1);
+
     return qvalues;
   }
 };
@@ -197,31 +195,41 @@ uptr<LearningAgent> LearningAgent::Read(std::istream &in) {
   return result;
 }
 
-void LearningAgent::Write(std::ostream &out) { /*impl->targetNet->Write(out);*/
+void LearningAgent::Write(std::ostream &out) {
+  python::PythonContextLock pl(impl->ptctx);
+  /*impl->targetNet->Write(out);*/
 }
 
 GameAction LearningAgent::SelectAction(const GameState *state) {
+  python::PythonContextLock pl(impl->ptctx);
   return impl->SelectAction(state);
 }
 
-void LearningAgent::SetPRandom(float pRandom) { impl->SetPRandom(pRandom); }
+void LearningAgent::SetPRandom(float pRandom) { impl->pRandom = pRandom; }
+
 void LearningAgent::SetTemperature(float temperature) {
-  impl->SetTemperature(temperature);
+  impl->temperature = temperature;
 }
 
 GameAction LearningAgent::SelectLearningAction(const GameState *state,
                                                const EVector &encodedState) {
+  python::PythonContextLock pl(impl->ptctx);
   return impl->SelectLearningAction(state, encodedState);
 }
 
 void LearningAgent::Learn(const vector<ExperienceMoment> &moments,
                           float learnRate) {
+  python::PythonContextLock pl(impl->ptctx);
   impl->Learn(moments, learnRate);
 }
 
-void LearningAgent::Finalise(void) { impl->Finalise(); }
+void LearningAgent::Finalise(void) {
+  python::PythonContextLock pl(impl->ptctx);
+  impl->Finalise();
+}
 
 float LearningAgent::GetQValue(const GameState &state,
                                const GameAction &action) {
+  python::PythonContextLock pl(impl->ptctx);
   return impl->GetQValue(state, action);
 }

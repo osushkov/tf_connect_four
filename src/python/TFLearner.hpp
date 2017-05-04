@@ -2,10 +2,9 @@
 
 #include "../util/Common.hpp"
 #include "NetworkSpec.hpp"
-#include "PythonContext.hpp"
 #include <boost/python/numpy.hpp>
-#include <vector>
 #include <cassert>
+#include <vector>
 
 namespace np = boost::python::numpy;
 namespace bp = boost::python;
@@ -43,9 +42,9 @@ struct QLearnBatch {
   np::ndarray successorStates;
 
   // 1D arrays.
-  np::ndarray actionsTaken; // action indices
+  np::ndarray actionsTaken;       // action indices
   np::ndarray isEndStateTerminal; // boolean
-  np::ndarray rewardsGained; // floats
+  np::ndarray rewardsGained;      // floats
 
   float futureRewardDiscount;
   float learnRate;
@@ -53,16 +52,16 @@ struct QLearnBatch {
 
 class TFLearner {
 public:
-  TFLearner(PythonThreadContext &ctx, const NetworkSpec &spec);
+  TFLearner(const NetworkSpec &spec);
   virtual ~TFLearner();
 
   // noncopyable
   TFLearner(const TFLearner &other) = delete;
   TFLearner &operator=(TFLearner &other) = delete;
 
-  void Learn(PythonThreadContext &ctx, const QLearnBatch &batch);
-  void UpdateTargetParams(PythonThreadContext &ctx);
-  np::ndarray QFunction(PythonThreadContext &ctx, const np::ndarray &state);
+  void Learn(const QLearnBatch &batch);
+  void UpdateTargetParams(void);
+  np::ndarray QFunction(const np::ndarray &state);
 
 private:
   struct TFLearnerImpl;

@@ -20,7 +20,7 @@
 using namespace learning;
 using namespace connectfour;
 
-static constexpr bool DO_TRAINING = false;
+static constexpr bool DO_TRAINING = true;
 static constexpr bool DO_EVALUATION = false;
 
 std::pair<float, float> evaluateAgent(learning::Agent *agent,
@@ -36,19 +36,19 @@ int main(int argc, char **argv) {
   // python::NetworkSpec spec;
   // python::TFLearner tfLearner(spec);
 
-  EMatrix mat = Eigen::MatrixXf::Zero(5, 8);
-  mat(1, 1) = 5.0f;
-  mat(2, 3) = 6.0f;
-  mat(4, 1) = 7.0f;
-  mat(4, 7) = 2.5f;
-
-  auto py_arr = python::ToNumpy(mat);
-  EMatrix cmat = python::ToEigen2D(py_arr);
-  std::cout << "orig: " << mat << std::endl;
-  std::cout << "conv: " << cmat << std::endl;
-
-  vector<bool> blah{true, false, true, true, false};
-  std::cout << python::ToNumpy(blah) << std::endl;
+  // EMatrix mat = Eigen::MatrixXf::Zero(5, 8);
+  // mat(1, 1) = 5.0f;
+  // mat(2, 3) = 6.0f;
+  // mat(4, 1) = 7.0f;
+  // mat(4, 7) = 2.5f;
+  //
+  // auto py_arr = python::ToNumpy(mat);
+  // EMatrix cmat = python::ToEigen2D(py_arr);
+  // std::cout << "orig: " << mat << std::endl;
+  // std::cout << "conv: " << cmat << std::endl;
+  //
+  // vector<bool> blah{true, false, true, true, false};
+  // std::cout << python::ToNumpy(blah) << std::endl;
 
   // tfLearner.Learn(python::QLearnBatch(python::EigenToNumpy(mat),
   //                                     python::EigenToNumpy(mat)));
