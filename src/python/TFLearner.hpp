@@ -24,7 +24,7 @@ struct QLearnBatch {
             np::empty(bp::make_tuple(1), np::dtype::get_builtin<bool>())),
         rewardsGained(
             np::empty(bp::make_tuple(1), np::dtype::get_builtin<float>())),
-        futureRewardDiscount(1.0f), learnRate(0.0f) {}
+        futureRewardDiscount(1.0f), learnRate(1.0f) {}
 
   QLearnBatch(const np::ndarray &initialStates,
               const np::ndarray &successorStates,
