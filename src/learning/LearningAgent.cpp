@@ -10,15 +10,11 @@
 #include "Constants.hpp"
 #include "TrainingSample.hpp"
 
-#include <boost/thread/shared_mutex.hpp>
 #include <cassert>
-#include <random>
 
 using namespace learning;
 
 struct LearningAgent::LearningAgentImpl {
-  mutable boost::shared_mutex rwMutex;
-
   float pRandom;
   float temperature;
 
@@ -38,8 +34,6 @@ struct LearningAgent::LearningAgentImpl {
 
   GameAction SelectAction(const GameState *state) {
     assert(state != nullptr);
-
-    boost::shared_lock<boost::shared_mutex> lock(rwMutex);
     return chooseBestAction(*state, LearningAgent::EncodeGameState(state));
   }
 
@@ -57,7 +51,6 @@ struct LearningAgent::LearningAgentImpl {
                                   const EVector &encodedState) {
     assert(state != nullptr);
 
-    boost::shared_lock<boost::shared_mutex> lock(rwMutex);
     if (util::RandInterval(0.0, 1.0) < pRandom) {
       return chooseExplorativeAction(*state);
     } else {
@@ -68,30 +61,14 @@ struct LearningAgent::LearningAgentImpl {
 
   void Learn(const vector<ExperienceMoment> &moments, float learnRate) {
     if (itersSinceTargetUpdated > TARGET_FUNCTION_UPDATE_RATE) {
-      boost::unique_lock<boost::shared_mutex> lock(rwMutex);
       learner->UpdateTargetParams(ptctx);
       itersSinceTargetUpdated = 0;
     }
+    learner->Learn(ptctx, makeQBatch(moments, learnRate));
     itersSinceTargetUpdated++;
-
-    vector<TrainingSample> learnSamples;
-    learnSamples.reserve(moments.size());
-
-    for (const auto &moment : moments) {
-      learnSamples.emplace_back(moment.initialState, moment.successorState,
-                                GameAction::ACTION_INDEX(moment.actionTaken),
-                                moment.isSuccessorTerminal, moment.reward,
-                                REWARD_DELAY_DISCOUNT);
-    }
-
-    // learningNet->Update(neuralnetwork::SamplesProvider(learnSamples),
-    // learnRate);
   }
 
   void Finalise(void) {
-    // obtain a write lock
-    boost::unique_lock<boost::shared_mutex> lock(rwMutex);
-
     // if (learningNet == nullptr) {
     //   return;
     // }
@@ -105,6 +82,27 @@ struct LearningAgent::LearningAgentImpl {
   float GetQValue(const GameState &state, const GameAction &action) {
     EMatrix qvalues = learnerInference(LearningAgent::EncodeGameState(&state));
     return qvalues(GameAction::ACTION_INDEX(action), 0);
+  }
+
+  python::QLearnBatch makeQBatch(const vector<ExperienceMoment> &moments, float learnRate) {
+    EMatrix initialStates(BOARD_WIDTH * BOARD_HEIGHT * 2, moments.size());
+    EMatrix successorStates(BOARD_WIDTH * BOARD_HEIGHT * 2, moments.size());
+    std::vector<int> actionsTaken(moments.size());
+    std::vector<bool> isEndStateTerminal(moments.size());
+    std::vector<float> rewardsGained(moments.size());
+
+    for (unsigned i = 0; i < moments.size(); i++) {
+      initialStates.col(i) = moments[i].initialState;
+      successorStates.col(i) = moments[i].successorState;
+      actionsTaken[i] = GameAction::ACTION_INDEX(moments[i].actionTaken);
+      isEndStateTerminal[i] = moments[i].isSuccessorTerminal;
+      rewardsGained[i] = moments[i].reward;
+    }
+
+    return python::QLearnBatch(
+        python::ToNumpy(initialStates), python::ToNumpy(successorStates),
+        python::ToNumpy(actionsTaken), python::ToNumpy(isEndStateTerminal),
+        python::ToNumpy(rewardsGained), REWARD_DELAY_DISCOUNT, learnRate);
   }
 
   GameAction chooseBestAction(const GameState &state,
