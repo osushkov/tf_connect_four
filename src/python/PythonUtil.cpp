@@ -103,7 +103,6 @@ EVector python::ToEigen1D(const np::ndarray &arr) {
 }
 
 EMatrix python::ToEigen2D(const np::ndarray &arr) {
-  std::cout << "---" << std::endl;
   assert(arr.get_nd() == 2);
 
   int rows = arr.shape(0);
@@ -119,7 +118,6 @@ EMatrix python::ToEigen2D(const np::ndarray &arr) {
     }
   }
 
-  std::cout << "+++" << std::endl;
   return result;
 }
 

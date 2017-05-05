@@ -21,7 +21,7 @@ struct LearningAgent::LearningAgentImpl {
   python::PythonThreadContext ptctx;
   uptr<python::TFLearner> learner;
 
-  unsigned itersSinceTargetUpdated = 0;
+  unsigned itersSinceTargetUpdated;
 
   LearningAgentImpl()
       : pRandom(0.0f), temperature(0.0001f), ptctx(python::GlobalContext()) {
