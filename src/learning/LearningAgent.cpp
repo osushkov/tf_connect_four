@@ -79,15 +79,15 @@ struct LearningAgent::LearningAgentImpl {
 
   python::QLearnBatch makeQBatch(const vector<ExperienceMoment> &moments,
                                  float learnRate) {
-    EMatrix initialStates(BOARD_WIDTH * BOARD_HEIGHT * 2, moments.size());
-    EMatrix successorStates(BOARD_WIDTH * BOARD_HEIGHT * 2, moments.size());
+    EMatrix initialStates(moments.size(), BOARD_WIDTH * BOARD_HEIGHT * 2);
+    EMatrix successorStates(moments.size(), BOARD_WIDTH * BOARD_HEIGHT * 2);
     std::vector<int> actionsTaken(moments.size());
     std::vector<bool> isEndStateTerminal(moments.size());
     std::vector<float> rewardsGained(moments.size());
 
     for (unsigned i = 0; i < moments.size(); i++) {
-      initialStates.col(i) = moments[i].initialState;
-      successorStates.col(i) = moments[i].successorState;
+      initialStates.row(i) = moments[i].initialState;
+      successorStates.row(i) = moments[i].successorState;
       actionsTaken[i] = GameAction::ACTION_INDEX(moments[i].actionTaken);
       isEndStateTerminal[i] = moments[i].isSuccessorTerminal;
       rewardsGained[i] = moments[i].reward;
@@ -148,8 +148,11 @@ struct LearningAgent::LearningAgentImpl {
 
   EMatrix learnerInference(const EVector &encodedState) {
     EMatrix qvalues =
-        python::ToEigen2D(learner->QFunction(python::ToNumpy(encodedState)));
-
+        python::ToEigen2D(learner->QFunction(python::ToNumpy(encodedState)))
+            .transpose();
+    std::cout << "wooo: " << qvalues << std::endl;
+    std::cout << "bleh: " << qvalues.rows() << " " << qvalues.cols()
+              << std::endl;
     assert(qvalues.rows() ==
            static_cast<int>(GameAction::ALL_ACTIONS().size()));
     assert(qvalues.cols() == 1);
