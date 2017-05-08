@@ -40,26 +40,26 @@ int main(int argc, char **argv) {
       if (iters % 5000 == 0) {
         cout << "iters: " << iters << endl;
       }
-      // if (iters % 5000 == 0) {
-      //   learning::RandomAgent randomAgent;
-      //   auto rar = evaluateAgent(agent, &randomAgent);
-      //   std::cout << "random " << iters << "\t" << rar.first << std::endl;
-      //
-      //   MinMaxAgent minmaxAgent1(1);
-      //   auto mar1 = evaluateAgent(agent, &minmaxAgent1);
-      //   std::cout << "minmax1 " << iters << "\t" << mar1.first << std::endl;
-      //
-      //   MinMaxAgent minmaxAgent2(2);
-      //   auto mar2 = evaluateAgent(agent, &minmaxAgent2);
-      //   std::cout << "minmax2 " << iters << "\t" << mar2.first << std::endl;
-      //
-      //   MinMaxAgent minmaxAgent3(3);
-      //   auto mar3 = evaluateAgent(agent, &minmaxAgent3);
-      //   std::cout << "minmax3 " << iters << "\t" << mar3.first << std::endl;
-      // }
+      if (iters % 5000 == 0) {
+        learning::RandomAgent randomAgent;
+        auto rar = evaluateAgent(agent, &randomAgent);
+        std::cout << "random " << iters << "\t" << rar.first << std::endl;
+
+        // MinMaxAgent minmaxAgent1(1);
+        // auto mar1 = evaluateAgent(agent, &minmaxAgent1);
+        // std::cout << "minmax1 " << iters << "\t" << mar1.first << std::endl;
+        //
+        // MinMaxAgent minmaxAgent2(2);
+        // auto mar2 = evaluateAgent(agent, &minmaxAgent2);
+        // std::cout << "minmax2 " << iters << "\t" << mar2.first << std::endl;
+        //
+        // MinMaxAgent minmaxAgent3(3);
+        // auto mar3 = evaluateAgent(agent, &minmaxAgent3);
+        // std::cout << "minmax3 " << iters << "\t" << mar3.first << std::endl;
+      }
     });
 
-    auto trainedAgent = trainer.TrainAgent(3000000);
+    auto trainedAgent = trainer.TrainAgent(100000);
 
     std::ofstream saveFile("agent.dat");
     trainedAgent->Write(saveFile);

@@ -3,8 +3,23 @@ from LearnerFramework import *
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
+import math
 
-batch_size = 1000
+
+class NNLayer:
+    def __init__(self, num_inputs, layer_size, activation_func, input_tensor):
+        self.num_inputs = num_inputs
+        self.layer_size = layer_size
+
+        init_range = math.sqrt(1.0/self.num_inputs)
+
+        self.weights = tf.Variable(
+            tf.truncated_normal([self.num_inputs, self.layer_size], stddev=init_range), dtype=tf.float32)
+
+        self.bias = tf.Variable(
+            tf.truncated_normal([self.layer_size], stddev=init_range), dtype=tf.float32)
+
+        self.layer_output = activation_func(tf.matmul(input_tensor, self.weights) + self.bias)
 
 class Learner(LearnerInstance):
 
@@ -12,9 +27,11 @@ class Learner(LearnerInstance):
         self.num_inputs = networkSpec.numInputs
         self.num_outputs = networkSpec.numOutputs
         self.max_batch_size = networkSpec.maxBatchSize
-        self.reward_discount = 0.99
+        self.reward_discount = 1.0
 
-        self.l1_size = self.num_inputs
+        self.l1_size = self.num_inputs * 2
+        self.l2_size = self.num_inputs
+        self.l3_size = self.num_inputs / 2
 
         self._buildGraph()
 
@@ -25,21 +42,13 @@ class Learner(LearnerInstance):
     def _buildTargetNetwork(self):
         self.target_network_input = tf.placeholder(tf.float32, shape=(self.max_batch_size, self.num_inputs))
 
-        # augment the input matrix with 1s so that we don have to use an explicit bias.
-        self.target_weights_l1 = tf.Variable(
-            tf.truncated_normal([self.num_inputs, self.l1_size], stddev=(1.0/self.num_inputs)), dtype=tf.float32)
-        self.target_bias_l1 = tf.Variable(
-            tf.truncated_normal([self.l1_size], stddev=(1.0/self.num_inputs)), dtype=tf.float32)
-        target_l1 = tf.nn.tanh(
-            tf.matmul(self.target_network_input, self.target_weights_l1) + self.target_bias_l1)
+        l0 = NNLayer(self.num_inputs, self.l1_size, tf.nn.elu, self.target_network_input)
+        l1 = NNLayer(l0.layer_size, self.l2_size, tf.nn.elu, l0.layer_output)
+        l2 = NNLayer(l1.layer_size, self.l3_size, tf.nn.elu, l1.layer_output)
+        l3 = NNLayer(l2.layer_size, self.num_outputs, tf.nn.tanh, l2.layer_output)
 
-        self.target_weights_output = tf.Variable(
-            tf.truncated_normal([self.l1_size, self.num_outputs], stddev=(1.0/self.l1_size)), dtype=tf.float32)
-        self.target_bias_output = tf.Variable(
-            tf.truncated_normal([self.num_outputs], stddev=(1.0/self.l1_size)), dtype=tf.float32)
-
-        self.target_network_output = tf.matmul(target_l1, self.target_weights_output) + self.target_bias_output
-
+        self.target_network = [l0, l1, l2, l3]
+        self.target_network_output = l3.layer_output
 
     def _buildLearnNetwork(self):
         # learning network
@@ -47,33 +56,36 @@ class Learner(LearnerInstance):
         self.learn_network_action_mask = tf.placeholder(tf.float32, shape=(self.max_batch_size, self.num_outputs))
         self.learn_network_terminal_mask = tf.placeholder(tf.bool, shape=(self.max_batch_size))
         self.learn_network_reward = tf.placeholder(tf.float32, shape=(self.max_batch_size, self.num_outputs))
+        self.learn_rate = tf.placeholder(tf.float32)
 
-        self.learn_weights_l1 = tf.Variable(
-            tf.truncated_normal([self.num_inputs, self.l1_size], stddev=(1.0/self.num_inputs)), dtype=tf.float32)
-        self.learn_bias_l1 = tf.Variable(
-            tf.truncated_normal([self.l1_size], stddev=(1.0/self.num_inputs)), dtype=tf.float32)
-        learn_l1 = tf.nn.tanh(
-            tf.matmul(self.learn_network_input, self.learn_weights_l1) + self.learn_bias_l1)
+        l0 = NNLayer(self.num_inputs, self.l1_size, tf.nn.elu, self.target_network_input)
+        l1 = NNLayer(l0.layer_size, self.l2_size, tf.nn.elu, l0.layer_output)
+        l2 = NNLayer(l1.layer_size, self.l3_size, tf.nn.elu, l1.layer_output)
+        l3 = NNLayer(l2.layer_size, self.num_outputs, tf.nn.tanh, l2.layer_output)
 
-        self.learn_weights_output = tf.Variable(
-            tf.truncated_normal([self.l1_size, self.num_outputs], stddev=(1.0/self.l1_size)), dtype=tf.float32)
-        self.learn_bias_output = tf.Variable(
-            tf.truncated_normal([self.num_outputs], stddev=(1.0/self.l1_size)), dtype=tf.float32)
-        learn_network_output = tf.matmul(learn_l1, self.learn_weights_output) + self.learn_bias_output
+        self.learn_network = [l0, l1, l2, l3]
+        self.learn_network_output = l3.layer_output
 
         terminating_target = self.learn_network_reward
         intermediate_target = self.target_network_output * self.reward_discount + self.learn_network_reward
-        target_output = tf.where(self.learn_network_terminal_mask, terminating_target, intermediate_target)
+        self.desired_output = tf.where(self.learn_network_terminal_mask, terminating_target, intermediate_target)
 
-        filtered_loss = tf.squared_difference(target_output, learn_network_output) * self.learn_network_action_mask
+        self.filtered_loss = tf.squared_difference(self.desired_output, self.learn_network_output) * self.learn_network_action_mask
 
-        self.learn_loss = tf.reduce_mean(filtered_loss)
-        self.learn_optimizer = tf.train.GradientDescentOptimizer(0.01).minimize(self.learn_loss)
+        self.learn_loss = tf.reduce_mean(self.filtered_loss)
+        self.learn_optimizer = tf.train.GradientDescentOptimizer(self.learn_rate).minimize(self.learn_loss)
 
-        self.update0 = tf.assign(self.target_weights_l1, self.learn_weights_l1, validate_shape=True, use_locking=True)
-        self.update1 = tf.assign(self.target_bias_l1, self.learn_bias_l1, validate_shape=True, use_locking=True)
-        self.update2 = tf.assign(self.target_weights_output, self.learn_weights_output, validate_shape=True, use_locking=True)
-        self.update3 = tf.assign(self.target_bias_output, self.learn_bias_output, validate_shape=True, use_locking=True)
+        self.update_ops = []
+
+        assert (len(self.target_network) == len(self.learn_network))
+        for i in range(len(self.target_network)):
+            dst_weights = self.target_network[i].weights
+            src_weights = self.learn_network[i].weights
+            self.update_ops.append(tf.assign(dst_weights, src_weights, validate_shape=True, use_locking=True))
+
+            dst_bias = self.target_network[i].bias
+            src_bias = self.learn_network[i].bias
+            self.update_ops.append(tf.assign(dst_bias, src_bias, validate_shape=True, use_locking=True))
 
 
     def _buildGraph(self):
@@ -112,15 +124,26 @@ class Learner(LearnerInstance):
             self.learn_network_action_mask: actions_mask,
             self.learn_network_terminal_mask: batch.isEndStateTerminal,
             self.learn_network_reward: rewards,
+            self.learn_rate: batch.learnRate
         }
 
-        _, l = self.sess.run([self.learn_optimizer, self.learn_loss], feed_dict=feed_dict)
-        print "learn loss: ", l
+        # _, l, lo, to, fl = self.sess.run([self.learn_optimizer,
+        #                                   self.learn_loss,
+        #                                   self.learn_network_output,
+        #                                   self.target_output,
+        #                                   self.filtered_loss],
+        #                      feed_dict=feed_dict)
+        # print "learn loss: ", l
+        # print "learn output:\n", lo
+        # print "target output:\n", to
+        # print "filtered loss:\n", fl
+
+        _, = self.sess.run([self.learn_optimizer], feed_dict=feed_dict)
 
 
     def UpdateTargetParams(self):
         with self.sess.as_default():
-            self.sess.run([self.update0, self.update1, self.update2, self.update3])
+            self.sess.run(self.update_ops)
 
 
     def QFunction(self, state):

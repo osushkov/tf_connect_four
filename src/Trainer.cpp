@@ -20,7 +20,7 @@
 
 using namespace learning;
 
-static constexpr unsigned EXPERIENCE_MEMORY_SIZE = 1000000;
+static constexpr unsigned EXPERIENCE_MEMORY_SIZE = 100000;
 
 static constexpr float INITIAL_PRANDOM = 0.5f;
 static constexpr float TARGET_PRANDOM = 0.01f;
@@ -135,7 +135,7 @@ struct Trainer::TrainerImpl {
         }
 
         float learnRate = INITIAL_LEARN_RATE * powf(learnRateDecay, i);
-        agent->Learn(memory->Sample(MOMENTS_BATCH_SIZE), 1.0f);
+        agent->Learn(memory->Sample(MOMENTS_BATCH_SIZE), learnRate);
         this->numLearnIters++;
       }
 

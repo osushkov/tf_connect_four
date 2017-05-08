@@ -34,7 +34,6 @@ std::pair<float, float> Evaluator::Evaluate(learning::Agent *primary, learning::
   unsigned numDraws = 0;
   for (unsigned i = 0; i < numTrials; i++) {
     int res = runTrial(primary, opponent);
-    std::cout << "trial! winner: " << res << std::endl;
     if (res == 0) {
       // std::cout << "ITS A DRAW!!!" << std::endl;
       numDraws++;

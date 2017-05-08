@@ -150,9 +150,6 @@ struct LearningAgent::LearningAgentImpl {
     EMatrix qvalues =
         python::ToEigen2D(learner->QFunction(python::ToNumpy(encodedState)))
             .transpose();
-    std::cout << "wooo: " << qvalues << std::endl;
-    std::cout << "bleh: " << qvalues.rows() << " " << qvalues.cols()
-              << std::endl;
     assert(qvalues.rows() ==
            static_cast<int>(GameAction::ALL_ACTIONS().size()));
     assert(qvalues.cols() == 1);
