@@ -28,8 +28,8 @@ static constexpr float TARGET_PRANDOM = 0.01f;
 static constexpr float INITIAL_TEMPERATURE = 0.5f;
 static constexpr float TARGET_TEMPERATURE = 0.001f;
 
-static constexpr float INITIAL_LEARN_RATE = 0.1f;
-static constexpr float TARGET_LEARN_RATE = 0.001f;
+static constexpr float INITIAL_LEARN_RATE = 0.01f;
+static constexpr float TARGET_LEARN_RATE = 0.0001f;
 
 
 struct PlayoutAgent {
@@ -145,41 +145,66 @@ struct Trainer::TrainerImpl {
 
   void playoutRoundVsSelf(LearningAgent *agent, ExperienceMemory *memory) {
     GameRules *rules = GameRules::Instance();
-    GameState curState = generateStartState();
-
     std::vector<PlayoutAgent> playoutAgents = {PlayoutAgent(agent, memory),
                                                PlayoutAgent(agent, memory)};
+
+    GameState initialState = rules->InitialState();
+    EVector encodedInitialState = LearningAgent::EncodeGameState(&initialState);
+
+    vector<GameState> curStates;
+    for (unsigned i = 0; i < MOMENTS_BATCH_SIZE; i++) {
+      curStates.emplace_back(generateStartState());
+    }
+
+    vector<bool> stateActive(curStates.size(), true);
+
     unsigned curPlayerIndex = 0;
     while (true) {
       PlayoutAgent &curPlayer = playoutAgents[curPlayerIndex];
       PlayoutAgent &otherPlayer = playoutAgents[(curPlayerIndex + 1) % 2];
 
-      EVector encodedState = LearningAgent::EncodeGameState(&curState);
-      GameAction action = curPlayer.agent->SelectLearningAction(&curState, encodedState);
+      vector<pair<GameState *, EVector>> encodedStates;
+      for (unsigned i = 0; i < curStates.size(); i++) {
+        if (stateActive[i]) {
+          encodedStates.emplace_back(&curStates[i], LearningAgent::EncodeGameState(&curStates[i]));
+        } else {
+          encodedStates.emplace_back(&initialState, encodedInitialState);
+        }
+      }
 
-      curPlayer.addTransitionToMemory(encodedState, 0.0f, false);
-      curPlayer.addMoveToHistory(encodedState, action);
+      vector<GameAction> actions = curPlayer.agent->SelectLearningActions(encodedStates);
+      for (unsigned i = 0; i < curStates.size(); i++) {
+        if (!stateActive[i]) {
+          continue;
+        }
 
-      curState = curState.SuccessorState(action);
+        EVector encodedState = encodedStates[i].second;
+        curPlayer.addTransitionToMemory(encodedState, 0.0f, false);
+        curPlayer.addMoveToHistory(encodedState, actions[i]);
 
-      switch (rules->GameCompletionState(curState)) {
-      case CompletionState::WIN:
-        encodedState = LearningAgent::EncodeGameState(&curState);
-        curPlayer.addTransitionToMemory(encodedState, 1.0f, true);
-        otherPlayer.addTransitionToMemory(encodedState, -1.0f, true);
-        return;
-      case CompletionState::LOSS:
-        assert(false); // This actually shouldn't be possible.
-        return;
-      case CompletionState::DRAW:
-        encodedState = LearningAgent::EncodeGameState(&curState);
-        curPlayer.addTransitionToMemory(encodedState, 0.0f, true);
-        otherPlayer.addTransitionToMemory(encodedState, 0.0f, true);
-        return;
-      case CompletionState::UNFINISHED:
-        curState.FlipState();
+        curStates[i] = curStates[i].SuccessorState(actions[i]);
+
+        switch (rules->GameCompletionState(curStates[i])) {
+        case CompletionState::WIN:
+          encodedState = LearningAgent::EncodeGameState(&curStates[i]);
+          curPlayer.addTransitionToMemory(encodedState, 1.0f, true);
+          otherPlayer.addTransitionToMemory(encodedState, -1.0f, true);
+          stateActive[i] = false;
+          break;
+        case CompletionState::LOSS:
+          assert(false); // This actually shouldn't be possible.
+          break;
+        case CompletionState::DRAW:
+          encodedState = LearningAgent::EncodeGameState(&curStates[i]);
+          curPlayer.addTransitionToMemory(encodedState, 0.0f, true);
+          otherPlayer.addTransitionToMemory(encodedState, 0.0f, true);
+          stateActive[i] = false;
+          break;
+        case CompletionState::UNFINISHED:
+          curStates[i].FlipState();
+          break;
+        }
         curPlayerIndex = (curPlayerIndex + 1) % 2;
-        break;
       }
     }
   }

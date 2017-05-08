@@ -73,7 +73,7 @@ class Learner(LearnerInstance):
         self.filtered_loss = tf.squared_difference(self.desired_output, self.learn_network_output) * self.learn_network_action_mask
 
         self.learn_loss = tf.reduce_mean(self.filtered_loss)
-        self.learn_optimizer = tf.train.GradientDescentOptimizer(self.learn_rate).minimize(self.learn_loss)
+        self.learn_optimizer = tf.train.AdamOptimizer(self.learn_rate).minimize(self.learn_loss)
 
         self.update_ops = []
 
@@ -93,6 +93,7 @@ class Learner(LearnerInstance):
         self.graph = tf.Graph()
 
         with self.graph.as_default():
+            tf.set_random_seed(1)
             self._buildTargetNetwork()
             self._buildLearnNetwork()
 

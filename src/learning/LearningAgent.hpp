@@ -8,6 +8,8 @@
 #include "ExperienceMoment.hpp"
 
 #include <iostream>
+#include <vector>
+#include <utility>
 
 using namespace connectfour;
 
@@ -28,7 +30,7 @@ public:
   void SetPRandom(float pRandom);
   void SetTemperature(float temperature);
 
-  GameAction SelectLearningAction(const GameState *state, const EVector &encodedState);
+  vector<GameAction> SelectLearningActions(const vector<pair<GameState*, EVector>> &states);
   void Learn(const vector<ExperienceMoment> &moments, float learnRate);
 
   void Finalise(void);

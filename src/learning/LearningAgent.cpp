@@ -40,16 +40,14 @@ struct LearningAgent::LearningAgentImpl {
     return chooseBestAction(*state, LearningAgent::EncodeGameState(state));
   }
 
-  GameAction SelectLearningAction(const GameState *state,
-                                  const EVector &encodedState) {
-    assert(state != nullptr);
-
-    if (util::RandInterval(0.0, 1.0) < pRandom) {
-      return chooseExplorativeAction(*state);
-    } else {
-      // return chooseWeightedAction(*state, encodedState);
-      return chooseBestAction(*state, encodedState);
+  vector<GameAction> SelectLearningActions(const vector<pair<GameState *, EVector>> &states) {
+    vector<GameAction> actions = chooseBestActions(states);
+    for (unsigned i = 0; i < actions.size(); i++) {
+      if (util::RandInterval(0.0, 1.0) < pRandom) {
+        actions[i] = chooseExplorativeAction(*states[i].first);
+      }
     }
+    return actions;
   }
 
   void Learn(const vector<ExperienceMoment> &moments, float learnRate) {
@@ -117,33 +115,41 @@ struct LearningAgent::LearningAgentImpl {
     return bestAction;
   }
 
+  vector<GameAction> chooseBestActions(const vector<pair<GameState *, EVector>> &states) {
+    assert(states.size() <= MOMENTS_BATCH_SIZE);
+
+    EMatrix encodedStates(states.size(), BOARD_WIDTH * BOARD_HEIGHT * 2);
+    for (unsigned i = 0; i < states.size(); i++) {
+      encodedStates.row(i) = states[i].second;
+    }
+
+    EMatrix qvalues = learnerInferenceBatch(encodedStates);
+
+    vector<GameAction> result;
+    for (unsigned i = 0; i < states.size(); i++) {
+      std::vector<unsigned> availableActions = states[i].first->AvailableActions();
+      assert(availableActions.size() > 0);
+
+      GameAction bestAction = GameAction::ACTION(availableActions[0]);
+      float bestQValue = qvalues(i, availableActions[0]);
+
+      for (unsigned j = 1; j < availableActions.size(); j++) {
+        float qv = qvalues(i, availableActions[j]);
+        if (qv > bestQValue) {
+          bestQValue = qv;
+          bestAction = GameAction::ACTION(availableActions[j]);
+        }
+      }
+
+      result.emplace_back(bestAction);
+    }
+
+    return result;
+  }
+
   GameAction chooseExplorativeAction(const GameState &state) {
     auto aa = state.AvailableActions();
     return GameAction::ACTION(aa[rand() % aa.size()]);
-  }
-
-  GameAction chooseWeightedAction(const GameState &state,
-                                  const EVector &encodedState) {
-    EMatrix qvalues = learnerInference(encodedState);
-
-    std::vector<unsigned> availableActions = state.AvailableActions();
-    std::vector<float> weights;
-
-    for (unsigned i = 0; i < availableActions.size(); i++) {
-      weights.push_back(qvalues(availableActions[i], 0) / temperature);
-    }
-    weights = util::SoftmaxWeights(weights);
-
-    float sample = util::RandInterval(0.0, 1.0);
-    for (unsigned i = 0; i < weights.size(); i++) {
-      sample -= weights[i];
-      if (sample <= 0.0f) {
-        // std::cout << "weighted: " << availableActions[i] << std::endl;
-        return GameAction::ACTION(availableActions[i]);
-      }
-    }
-
-    return chooseExplorativeAction(state);
   }
 
   EMatrix learnerInference(const EVector &encodedState) {
@@ -154,6 +160,15 @@ struct LearningAgent::LearningAgentImpl {
            static_cast<int>(GameAction::ALL_ACTIONS().size()));
     assert(qvalues.cols() == 1);
 
+    return qvalues;
+  }
+
+  EMatrix learnerInferenceBatch(const EMatrix &encodedStates) {
+    EMatrix qvalues =
+        python::ToEigen2D(learner->QFunction(python::ToNumpy(encodedStates)));
+    assert(qvalues.cols() ==
+           static_cast<int>(GameAction::ALL_ACTIONS().size()));
+    assert(qvalues.rows() == encodedStates.rows());
     return qvalues;
   }
 };
@@ -211,10 +226,11 @@ void LearningAgent::SetTemperature(float temperature) {
   impl->temperature = temperature;
 }
 
-GameAction LearningAgent::SelectLearningAction(const GameState *state,
-                                               const EVector &encodedState) {
+vector<GameAction> LearningAgent::SelectLearningActions(
+    const vector<pair<GameState *, EVector>> &states) {
+
   python::PythonContextLock pl(impl->ptctx);
-  return impl->SelectLearningAction(state, encodedState);
+  return impl->SelectLearningActions(states);
 }
 
 void LearningAgent::Learn(const vector<ExperienceMoment> &moments,

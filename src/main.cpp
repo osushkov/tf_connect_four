@@ -25,12 +25,12 @@ static constexpr bool DO_EVALUATION = false;
 
 std::pair<float, float> evaluateAgent(learning::Agent *agent,
                                       learning::Agent *opponent) {
-  Evaluator eval(1000);
+  Evaluator eval(200);
   return eval.Evaluate(agent, opponent);
 }
 
 int main(int argc, char **argv) {
-  srand(time(NULL));
+  srand(1337);
   python::Initialise();
 
   // Train an agent.
