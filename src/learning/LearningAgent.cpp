@@ -104,11 +104,12 @@ struct LearningAgent::LearningAgentImpl {
     assert(availableActions.size() > 0);
 
     GameAction bestAction = GameAction::ACTION(availableActions[0]);
-    float bestQValue = qvalues(availableActions[0], 0);
+    float bestQValue = qvalues(0, availableActions[0]);
 
     for (unsigned i = 1; i < availableActions.size(); i++) {
-      if (qvalues(availableActions[i]) > bestQValue) {
-        bestQValue = qvalues(availableActions[i], 0);
+      float qv = qvalues(0, availableActions[i]);
+      if (qv > bestQValue) {
+        bestQValue = qv;
         bestAction = GameAction::ACTION(availableActions[i]);
       }
     }
@@ -154,11 +155,10 @@ struct LearningAgent::LearningAgentImpl {
 
   EMatrix learnerInference(const EVector &encodedState) {
     EMatrix qvalues =
-        python::ToEigen2D(learner->QFunction(python::ToNumpy(encodedState)))
-            .transpose();
-    assert(qvalues.rows() ==
+        python::ToEigen2D(learner->QFunction(python::ToNumpy(encodedState)));
+    assert(qvalues.cols() ==
            static_cast<int>(GameAction::ALL_ACTIONS().size()));
-    assert(qvalues.cols() == 1);
+    assert(qvalues.rows() == 1);
 
     return qvalues;
   }
