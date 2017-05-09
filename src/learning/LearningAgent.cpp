@@ -40,7 +40,8 @@ struct LearningAgent::LearningAgentImpl {
     return chooseBestAction(*state, LearningAgent::EncodeGameState(state));
   }
 
-  vector<GameAction> SelectLearningActions(const vector<pair<GameState *, EVector>> &states) {
+  vector<GameAction>
+  SelectLearningActions(const vector<pair<GameState *, EVector>> &states) {
     vector<GameAction> actions = chooseBestActions(states);
     for (unsigned i = 0; i < actions.size(); i++) {
       if (util::RandInterval(0.0, 1.0) < pRandom) {
@@ -113,10 +114,12 @@ struct LearningAgent::LearningAgentImpl {
         bestAction = GameAction::ACTION(availableActions[i]);
       }
     }
+
     return bestAction;
   }
 
-  vector<GameAction> chooseBestActions(const vector<pair<GameState *, EVector>> &states) {
+  vector<GameAction>
+  chooseBestActions(const vector<pair<GameState *, EVector>> &states) {
     assert(states.size() <= MOMENTS_BATCH_SIZE);
 
     EMatrix encodedStates(states.size(), BOARD_WIDTH * BOARD_HEIGHT * 2);
@@ -128,7 +131,8 @@ struct LearningAgent::LearningAgentImpl {
 
     vector<GameAction> result;
     for (unsigned i = 0; i < states.size(); i++) {
-      std::vector<unsigned> availableActions = states[i].first->AvailableActions();
+      std::vector<unsigned> availableActions =
+          states[i].first->AvailableActions();
       assert(availableActions.size() > 0);
 
       GameAction bestAction = GameAction::ACTION(availableActions[0]);

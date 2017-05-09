@@ -1,7 +1,5 @@
 
 #include "Trainer.hpp"
-#include "util/Common.hpp"
-#include "util/Timer.hpp"
 #include "connectfour/GameAction.hpp"
 #include "connectfour/GameRules.hpp"
 #include "connectfour/GameState.hpp"
@@ -9,6 +7,8 @@
 #include "learning/ExperienceMemory.hpp"
 #include "learning/LearningAgent.hpp"
 #include "learning/RandomAgent.hpp"
+#include "util/Common.hpp"
+#include "util/Timer.hpp"
 
 #include <atomic>
 #include <cassert>
@@ -20,7 +20,6 @@
 
 using namespace learning;
 
-
 struct PlayoutAgent {
   LearningAgent *agent;
   ExperienceMemory *memory;
@@ -28,7 +27,8 @@ struct PlayoutAgent {
   vector<EVector> stateHistory;
   vector<GameAction> actionHistory;
 
-  PlayoutAgent(LearningAgent *agent, ExperienceMemory *memory) : agent(agent), memory(memory) {}
+  PlayoutAgent(LearningAgent *agent, ExperienceMemory *memory)
+      : agent(agent), memory(memory) {}
 
   bool havePreviousState(void) { return stateHistory.size() > 0; }
 
@@ -40,8 +40,8 @@ struct PlayoutAgent {
     EVector &prevState = stateHistory[stateHistory.size() - 1];
     GameAction &performedAction = actionHistory[actionHistory.size() - 1];
 
-    memory->AddExperience(
-        ExperienceMoment(prevState, performedAction, curState, reward, isTerminal));
+    memory->AddExperience(ExperienceMoment(prevState, performedAction, curState,
+                                           reward, isTerminal));
   }
 
   void addMoveToHistory(const EVector &state, const GameAction &action) {
@@ -54,7 +54,9 @@ struct Trainer::TrainerImpl {
   vector<ProgressCallback> callbacks;
   atomic<unsigned> numLearnIters;
 
-  void AddProgressCallback(ProgressCallback callback) { callbacks.push_back(callback); }
+  void AddProgressCallback(ProgressCallback callback) {
+    callbacks.push_back(callback);
+  }
 
   uptr<LearningAgent> TrainAgent(unsigned iters) {
     auto experienceMemory =
@@ -85,38 +87,41 @@ struct Trainer::TrainerImpl {
                                  unsigned iters, float initialPRandom,
                                  float targetPRandom) {
 
-    return std::thread([this, agent, memory, iters, initialPRandom, targetPRandom]() {
-      float pRandDecay = powf(targetPRandom / initialPRandom, 1.0f / iters);
-      assert(pRandDecay > 0.0f && pRandDecay <= 1.0f);
+    return std::thread(
+        [this, agent, memory, iters, initialPRandom, targetPRandom]() {
+          float pRandDecay = powf(targetPRandom / initialPRandom, 1.0f / iters);
+          assert(pRandDecay > 0.0f && pRandDecay <= 1.0f);
 
-      // float tempDecay = powf(TARGET_TEMPERATURE / INITIAL_TEMPERATURE, 1.0f / iters);
-      // assert(tempDecay > 0.0f && tempDecay <= 1.0f);
+          // float tempDecay = powf(TARGET_TEMPERATURE / INITIAL_TEMPERATURE,
+          // 1.0f / iters); assert(tempDecay > 0.0f && tempDecay <= 1.0f);
 
-      while (true) {
-        unsigned doneIters = numLearnIters.load();
-        if (doneIters >= iters) {
-          break;
-        }
+          while (true) {
+            unsigned doneIters = numLearnIters.load();
+            if (doneIters >= iters) {
+              break;
+            }
 
-        float prand = initialPRandom * powf(pRandDecay, doneIters);
-        // float temp = INITIAL_TEMPERATURE * powf(tempDecay, doneIters);
+            float prand = initialPRandom * powf(pRandDecay, doneIters);
+            // float temp = INITIAL_TEMPERATURE * powf(tempDecay, doneIters);
 
-        agent->SetPRandom(prand);
-        // agent->SetTemperature(temp);
+            agent->SetPRandom(prand);
+            // agent->SetTemperature(temp);
 
-        // this->playoutRoundVsSelf(agent, memory);
-        this->playoutRoundVsRandom(agent, memory);
-      }
-    });
+            this->playoutRoundVsSelf(agent, memory);
+            // this->playoutRoundVsRandom(agent, memory);
+          }
+        });
   }
 
-  std::thread startLearnThread(LearningAgent *agent, ExperienceMemory *memory, unsigned iters) {
+  std::thread startLearnThread(LearningAgent *agent, ExperienceMemory *memory,
+                               unsigned iters) {
     return std::thread([this, agent, memory, iters]() {
       while (memory->NumMemories() < 10 * MOMENTS_BATCH_SIZE) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
       }
 
-      float learnRateDecay = powf(TARGET_LEARN_RATE / INITIAL_LEARN_RATE, 1.0f / iters);
+      float learnRateDecay =
+          powf(TARGET_LEARN_RATE / INITIAL_LEARN_RATE, 1.0f / iters);
       assert(learnRateDecay > 0.0f && learnRateDecay < 1.0f);
 
       for (unsigned i = 0; i < iters; i++) {
@@ -156,13 +161,15 @@ struct Trainer::TrainerImpl {
       vector<pair<GameState *, EVector>> encodedStates;
       for (unsigned i = 0; i < curStates.size(); i++) {
         if (stateActive[i]) {
-          encodedStates.emplace_back(&curStates[i], LearningAgent::EncodeGameState(&curStates[i]));
+          encodedStates.emplace_back(
+              &curStates[i], LearningAgent::EncodeGameState(&curStates[i]));
         } else {
           encodedStates.emplace_back(&initialState, encodedInitialState);
         }
       }
 
-      vector<GameAction> actions = curPlayer.agent->SelectLearningActions(encodedStates);
+      vector<GameAction> actions =
+          curPlayer.agent->SelectLearningActions(encodedStates);
 
       unsigned numActiveStates = 0;
       for (unsigned i = 0; i < curStates.size(); i++) {
@@ -227,7 +234,8 @@ struct Trainer::TrainerImpl {
       vector<pair<GameState *, EVector>> encodedStates;
       for (unsigned i = 0; i < curStates.size(); i++) {
         if (stateActive[i]) {
-          encodedStates.emplace_back(&curStates[i], LearningAgent::EncodeGameState(&curStates[i]));
+          encodedStates.emplace_back(
+              &curStates[i], LearningAgent::EncodeGameState(&curStates[i]));
         } else {
           encodedStates.emplace_back(&initialState, encodedInitialState);
         }
@@ -265,7 +273,8 @@ struct Trainer::TrainerImpl {
         switch (rules->GameCompletionState(curStates[i])) {
         case CompletionState::WIN:
           encodedState = LearningAgent::EncodeGameState(&curStates[i]);
-          playoutAgent.addTransitionToMemory(encodedState, curPlayerIndex == 0 ? 1.0f : -1.0f, true);
+          playoutAgent.addTransitionToMemory(
+              encodedState, curPlayerIndex == 0 ? 1.0f : -1.0f, true);
           stateActive[i] = false;
           break;
         case CompletionState::LOSS:
@@ -331,4 +340,6 @@ void Trainer::AddProgressCallback(ProgressCallback callback) {
   impl->AddProgressCallback(callback);
 }
 
-uptr<LearningAgent> Trainer::TrainAgent(unsigned iters) { return impl->TrainAgent(iters); }
+uptr<LearningAgent> Trainer::TrainAgent(unsigned iters) {
+  return impl->TrainAgent(iters);
+}

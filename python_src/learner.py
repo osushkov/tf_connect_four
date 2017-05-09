@@ -17,7 +17,7 @@ class NNLayer:
             tf.truncated_normal([self.num_inputs, self.layer_size], stddev=init_range), dtype=tf.float32)
 
         self.bias = tf.Variable(
-            tf.zeros([self.layer_size]), dtype=tf.float32)
+            tf.truncated_normal([self.layer_size], stddev=init_range), dtype=tf.float32)
 
         self.layer_output = activation_func(tf.matmul(input_tensor, self.weights) + self.bias)
 
@@ -36,7 +36,8 @@ class Learner(LearnerInstance):
         self._buildGraph()
 
         self.sess = tf.Session(graph=self.graph)
-        self.sess.run(self.init_op)
+        with self.sess.as_default():
+            self.sess.run([self.init_op])
 
 
     def _buildTargetNetwork(self):
@@ -77,7 +78,7 @@ class Learner(LearnerInstance):
             self.desired_output, self.learn_network_output) * tf.one_hot(self.learn_network_action_index, self.num_outputs)
 
         self.learn_loss = tf.reduce_mean(self.filtered_loss)
-        self.learn_optimizer = tf.train.AdamOptimizer(self.learn_rate, beta1=0.99).minimize(self.learn_loss)
+        self.learn_optimizer = tf.train.GradientDescentOptimizer(self.learn_rate).minimize(self.learn_loss)
 
         self.update_ops = []
 
@@ -160,4 +161,7 @@ class Learner(LearnerInstance):
 
         with self.sess.as_default():
             feed_dict = {self.target_network_input: state}
-            return self.sess.run([self.target_network_output], feed_dict=feed_dict)[0][:original_input_size, :]
+            r = self.sess.run([self.target_network_output], feed_dict=feed_dict)[0][:original_input_size, :]
+            # print r
+            # raw_input("Press Enter to continue...")
+            return r
