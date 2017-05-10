@@ -37,7 +37,9 @@ struct LearningAgent::LearningAgentImpl {
 
   GameAction SelectAction(const GameState *state) {
     assert(state != nullptr);
-    return chooseBestAction(*state, LearningAgent::EncodeGameState(state));
+    auto r = chooseBestAction(*state, LearningAgent::EncodeGameState(state));
+    std::cout << "sa: " << r << std::endl;
+    return r;
   }
 
   vector<GameAction>
@@ -47,6 +49,8 @@ struct LearningAgent::LearningAgentImpl {
       if (util::RandInterval(0.0, 1.0) < pRandom) {
         actions[i] = chooseExplorativeAction(*states[i].first);
       }
+
+      // std::cout << "sla: " << actions[i] << std::endl;
     }
     return actions;
   }

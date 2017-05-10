@@ -107,8 +107,8 @@ struct Trainer::TrainerImpl {
             agent->SetPRandom(prand);
             // agent->SetTemperature(temp);
 
-            this->playoutRoundVsSelf(agent, memory);
-            // this->playoutRoundVsRandom(agent, memory);
+            // this->playoutRoundVsSelf(agent, memory);
+            this->playoutRoundVsRandom(agent, memory);
           }
         });
   }

@@ -14,10 +14,10 @@ class NNLayer:
         init_range = math.sqrt(1.0/self.num_inputs)
 
         self.weights = tf.Variable(
-            tf.truncated_normal([self.num_inputs, self.layer_size], stddev=init_range), dtype=tf.float32)
+            tf.random_uniform([self.num_inputs, self.layer_size], minval=-init_range, maxval=init_range),
+            dtype=tf.float32)
 
-        self.bias = tf.Variable(
-            tf.truncated_normal([self.layer_size], stddev=init_range), dtype=tf.float32)
+        self.bias = tf.Variable(tf.zeros([self.layer_size]), dtype=tf.float32)
 
         self.layer_output = activation_func(tf.matmul(input_tensor, self.weights) + self.bias)
 
@@ -27,12 +27,9 @@ class Learner(LearnerInstance):
         self.num_inputs = networkSpec.numInputs
         self.num_outputs = networkSpec.numOutputs
         self.max_batch_size = networkSpec.maxBatchSize
-        self.reward_discount = 1.0
+        self.reward_discount = 0.9
 
-        self.l1_size = self.num_inputs * 2
-        self.l2_size = self.num_inputs
-        self.l3_size = self.num_inputs / 2
-
+        self.layer_sizes = [self.num_inputs]#, self.num_inputs]
         self._buildGraph()
 
         self.sess = tf.Session(graph=self.graph)
@@ -43,13 +40,18 @@ class Learner(LearnerInstance):
     def _buildTargetNetwork(self):
         self.target_network_input = tf.placeholder(tf.float32, shape=(self.max_batch_size, self.num_inputs))
 
-        l0 = NNLayer(self.num_inputs, self.l1_size, tf.nn.elu, self.target_network_input)
-        l1 = NNLayer(l0.layer_size, self.l2_size, tf.nn.elu, l0.layer_output)
-        # l2 = NNLayer(l1.layer_size, self.l3_size, tf.nn.elu, l1.layer_output)
-        l2 = NNLayer(l1.layer_size, self.num_outputs, tf.nn.tanh, l1.layer_output)
+        self.target_network = []
+        for ls in self.layer_sizes:
+            if len(self.target_network) == 0:
+                self.target_network.append(
+                    NNLayer(self.num_inputs, ls, tf.nn.relu6, self.target_network_input))
+            else:
+                pl = self.target_network[-1]
+                self.target_network.append(NNLayer(pl.layer_size, ls, tf.nn.relu6, pl.layer_output))
 
-        self.target_network = [l0, l1, l2]
-        self.target_network_output = l2.layer_output
+        pl = self.target_network[-1]
+        self.target_network.append(NNLayer(pl.layer_size, self.num_outputs, tf.nn.tanh, pl.layer_output))
+        self.target_network_output = self.target_network[-1].layer_output
 
     def _buildLearnNetwork(self):
         # learning network
@@ -59,16 +61,21 @@ class Learner(LearnerInstance):
         self.learn_network_reward = tf.placeholder(tf.float32, shape=(self.max_batch_size))
         self.learn_rate = tf.placeholder(tf.float32)
 
-        l0 = NNLayer(self.num_inputs, self.l1_size, tf.nn.elu, self.target_network_input)
-        l1 = NNLayer(l0.layer_size, self.l2_size, tf.nn.elu, l0.layer_output)
-        # l2 = NNLayer(l1.layer_size, self.l3_size, tf.nn.elu, l1.layer_output)
-        l2 = NNLayer(l1.layer_size, self.num_outputs, tf.nn.tanh, l1.layer_output)
+        self.learn_network = []
+        for ls in self.layer_sizes:
+            if len(self.learn_network) == 0:
+                self.learn_network.append(
+                    NNLayer(self.num_inputs, ls, tf.nn.relu6, self.learn_network_input))
+            else:
+                pl = self.learn_network[-1]
+                self.learn_network.append(NNLayer(pl.layer_size, ls, tf.nn.relu6, pl.layer_output))
 
-        self.learn_network = [l0, l1, l2]
-        self.learn_network_output = l2.layer_output
+        pl = self.learn_network[-1]
+        self.learn_network.append(NNLayer(pl.layer_size, self.num_outputs, tf.nn.tanh, pl.layer_output))
+        self.learn_network_output = self.learn_network[-1].layer_output
 
         terminating_target = self.learn_network_reward
-        intermediate_target = tf.reduce_max(self.target_network_output, axis=1) * self.reward_discount + self.learn_network_reward
+        intermediate_target = self.learn_network_reward + (tf.reduce_max(self.target_network_output, axis=1) * self.reward_discount)
         self.desired_output = tf.tile(
             tf.reshape(
                 tf.where(self.learn_network_terminal_mask, terminating_target, intermediate_target), [-1, 1]),
@@ -78,7 +85,7 @@ class Learner(LearnerInstance):
             self.desired_output, self.learn_network_output) * tf.one_hot(self.learn_network_action_index, self.num_outputs)
 
         self.learn_loss = tf.reduce_mean(self.filtered_loss)
-        self.learn_optimizer = tf.train.GradientDescentOptimizer(self.learn_rate).minimize(self.learn_loss)
+        self.learn_optimizer = tf.train.AdamOptimizer(self.learn_rate, beta1=0.99).minimize(self.learn_loss)
 
         self.update_ops = []
 
@@ -133,10 +140,23 @@ class Learner(LearnerInstance):
         # print "target output:\n", to
         # print "filtered loss:\n", fl
 
-        _ = self.sess.run([self.learn_optimizer], feed_dict=feed_dict)
-
+        _, l, do, fl = self.sess.run([self.learn_optimizer, self.learn_loss, self.desired_output, self.filtered_loss], feed_dict=feed_dict)
+        # print "actions taken: ", batch.actionsTaken
+        # print "desired output: ", do
+        # print "filtered loss: ", fl
+        # raw_input("blah")
+        # print "loss: ", l
 
     def UpdateTargetParams(self):
+        # print("pre-update params")
+        # with self.sess.as_default():
+        #     ps = self.sess.run([self.learn_network[0].weights, self.learn_network[0].bias,
+        #                         self.learn_network[1].weights, self.learn_network[1].bias,
+        #                         self.target_network[0].weights, self.target_network[0].bias,
+        #                         self.target_network[1].weights, self.target_network[1].bias])
+        #     for p in ps:
+        #         print p
+        #
         with self.sess.as_default():
             self.sess.run(self.update_ops)
 
@@ -159,9 +179,14 @@ class Learner(LearnerInstance):
 
         assert (state.shape[0] == self.max_batch_size and state.shape[1] == self.num_inputs)
 
+
         with self.sess.as_default():
             feed_dict = {self.target_network_input: state}
             r = self.sess.run([self.target_network_output], feed_dict=feed_dict)[0][:original_input_size, :]
             # print r
             # raw_input("Press Enter to continue...")
+            if original_input_size < 10:
+                print state[0]
+                print r
+                raw_input("weee")
             return r
