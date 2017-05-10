@@ -38,7 +38,7 @@ struct LearningAgent::LearningAgentImpl {
   GameAction SelectAction(const GameState *state) {
     assert(state != nullptr);
     auto r = chooseBestAction(*state, LearningAgent::EncodeGameState(state));
-    std::cout << "sa: " << r << std::endl;
+    // std::cout << "sa: " << r << std::endl;
     return r;
   }
 
