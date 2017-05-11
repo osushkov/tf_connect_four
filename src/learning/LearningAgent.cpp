@@ -60,6 +60,7 @@ struct LearningAgent::LearningAgentImpl {
       learner->UpdateTargetParams();
       itersSinceTargetUpdated = 0;
     }
+
     learner->Learn(makeQBatch(moments, learnRate));
     itersSinceTargetUpdated++;
   }

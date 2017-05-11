@@ -103,7 +103,6 @@ struct Trainer::TrainerImpl {
 
             float prand = initialPRandom * powf(pRandDecay, doneIters);
             // float temp = INITIAL_TEMPERATURE * powf(tempDecay, doneIters);
-
             agent->SetPRandom(prand);
             // agent->SetTemperature(temp);
 
@@ -216,7 +215,7 @@ struct Trainer::TrainerImpl {
   void playoutRoundVsRandom(LearningAgent *agent, ExperienceMemory *memory) {
     GameRules *rules = GameRules::Instance();
 
-    PlayoutAgent playoutAgent = PlayoutAgent(agent, memory);
+    vector<PlayoutAgent> playoutAgents;
     RandomAgent randomAgent;
 
     GameState initialState = rules->InitialState();
@@ -224,6 +223,7 @@ struct Trainer::TrainerImpl {
 
     vector<GameState> curStates;
     for (unsigned i = 0; i < MOMENTS_BATCH_SIZE; i++) {
+      playoutAgents.emplace_back(agent, memory);
       curStates.emplace_back(generateStartState());
     }
 
@@ -243,7 +243,7 @@ struct Trainer::TrainerImpl {
 
       vector<GameAction> actions;
       if (curPlayerIndex == 0) {
-        actions = playoutAgent.agent->SelectLearningActions(encodedStates);
+        actions = agent->SelectLearningActions(encodedStates);
       } else {
         for (unsigned i = 0; i < curStates.size(); i++) {
           if (stateActive[i]) {
@@ -264,8 +264,8 @@ struct Trainer::TrainerImpl {
         EVector encodedState = encodedStates[i].second;
 
         if (curPlayerIndex == 0) {
-          playoutAgent.addTransitionToMemory(encodedState, 0.0f, false);
-          playoutAgent.addMoveToHistory(encodedState, actions[i]);
+          playoutAgents[i].addTransitionToMemory(encodedState, 0.0f, false);
+          playoutAgents[i].addMoveToHistory(encodedState, actions[i]);
         }
 
         curStates[i] = curStates[i].SuccessorState(actions[i]);
@@ -273,7 +273,7 @@ struct Trainer::TrainerImpl {
         switch (rules->GameCompletionState(curStates[i])) {
         case CompletionState::WIN:
           encodedState = LearningAgent::EncodeGameState(&curStates[i]);
-          playoutAgent.addTransitionToMemory(
+          playoutAgents[i].addTransitionToMemory(
               encodedState, curPlayerIndex == 0 ? 1.0f : -1.0f, true);
           stateActive[i] = false;
           break;
@@ -282,7 +282,7 @@ struct Trainer::TrainerImpl {
           break;
         case CompletionState::DRAW:
           encodedState = LearningAgent::EncodeGameState(&curStates[i]);
-          playoutAgent.addTransitionToMemory(encodedState, 0.0f, true);
+          playoutAgents[i].addTransitionToMemory(encodedState, 0.0f, true);
           stateActive[i] = false;
           break;
         case CompletionState::UNFINISHED:

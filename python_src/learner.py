@@ -70,7 +70,6 @@ class Learner(LearnerInstance):
     def _buildLearnNetwork(self):
         # learning network
         self.learn_network_input = tf.placeholder(tf.float32, shape=(self.max_batch_size, self.num_inputs))
-        self.learn_network_successor_qvalues = tf.placeholder(tf.float32, shape=(self.max_batch_size, self.num_outputs))
         self.learn_network_action_index = tf.placeholder(tf.int32, shape=(self.max_batch_size))
         self.learn_network_terminal_mask = tf.placeholder(tf.bool, shape=(self.max_batch_size))
         self.learn_network_reward = tf.placeholder(tf.float32, shape=(self.max_batch_size))
@@ -90,7 +89,7 @@ class Learner(LearnerInstance):
         self.learn_network_output = self.learn_network[-1].layer_output
 
         terminating_target = self.learn_network_reward
-        intermediate_target = self.learn_network_reward + (tf.reduce_max(self.learn_network_successor_qvalues, axis=1) * self.reward_discount)
+        intermediate_target = self.learn_network_reward + (tf.reduce_max(self.target_network_output, axis=1) * self.reward_discount)
         self.desired_output = tf.stop_gradient(
             tf.where(self.learn_network_terminal_mask, terminating_target, intermediate_target))
 
@@ -100,24 +99,24 @@ class Learner(LearnerInstance):
 
         self.learn_loss = tf.losses.mean_squared_error(self.desired_output, self.indexed_output)
 
-        opt = tf.train.GradientDescentOptimizer(self.learn_rate)
+        opt = tf.train.AdamOptimizer(self.learn_rate, beta1=0.99)
 
         vars_to_optimise = []
         for ll in self.learn_network:
             vars_to_optimise.append(ll.weights)
             vars_to_optimise.append(ll.bias)
 
-        self.learn_optimizer = opt.minimize(self.learn_loss, var_list=vars_to_optimise, gate_gradients=2)
-        self.update_ops = []
+        self.learn_optimizer = opt.minimize(self.learn_loss, var_list=vars_to_optimise)
 
+        self.update_ops = []
         assert (len(self.target_network) == len(self.learn_network))
         for i in range(len(self.target_network)):
             dst_weights = self.target_network[i].weights
-            src_weights = tf.stop_gradient(self.learn_network[i].weights)
+            src_weights = self.learn_network[i].weights
             self.update_ops.append(tf.assign(dst_weights, src_weights, validate_shape=True, use_locking=True))
 
             dst_bias = self.target_network[i].bias
-            src_bias = tf.stop_gradient(self.learn_network[i].bias)
+            src_bias = self.learn_network[i].bias
             self.update_ops.append(tf.assign(dst_bias, src_bias, validate_shape=True, use_locking=True))
 
 
@@ -130,12 +129,9 @@ class Learner(LearnerInstance):
         assert (batch.rewardsGained.ndim == 1 and batch.rewardsGained.shape[0] == self.max_batch_size)
 
         with self.sess.as_default():
-            target_feed_dict = {self.target_network_input: batch.successorStates}
-            target_qvals = self.sess.run([self.target_network_output], feed_dict=target_feed_dict)[0]
-
             learn_feed_dict = {
                 self.learn_network_input: batch.initialStates,
-                self.learn_network_successor_qvalues: target_qvals,
+                self.target_network_input: batch.successorStates,
                 self.learn_network_action_index: batch.actionsTaken,
                 self.learn_network_terminal_mask: batch.isEndStateTerminal,
                 self.learn_network_reward: batch.rewardsGained,
