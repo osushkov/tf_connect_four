@@ -11,7 +11,7 @@ class NNLayer:
         self.num_inputs = num_inputs
         self.layer_size = layer_size
 
-        init_range = math.sqrt(1.0/self.num_inputs)
+        init_range = 1.0 / self.num_inputs
 
         self.weights = tf.Variable(
             tf.random_uniform([self.num_inputs, self.layer_size], minval=-init_range, maxval=init_range),
@@ -23,20 +23,31 @@ class NNLayer:
 
         self.layer_output = activation_func(tf.matmul(input_tensor, self.weights) + self.bias)
 
-class Learner(LearnerInstance):
 
+class Learner(LearnerInstance):
     def __init__(self, networkSpec):
         self.num_inputs = networkSpec.numInputs
         self.num_outputs = networkSpec.numOutputs
         self.max_batch_size = networkSpec.maxBatchSize
         self.reward_discount = 1.0
 
-        self.layer_sizes = [self.num_inputs, self.num_inputs]
+        self.layer_sizes = [self.num_inputs, self.num_inputs / 2]
         self._buildGraph()
 
         self.sess = tf.Session(graph=self.graph)
         with self.sess.as_default():
             self.sess.run([self.init_op])
+            self.sess.run(self.update_ops)
+
+
+    def _buildGraph(self):
+        self.total_iters = 0
+        self.graph = tf.Graph()
+
+        with self.graph.as_default():
+            self._buildTargetNetwork()
+            self._buildLearnNetwork()
+            self.init_op = tf.global_variables_initializer()
 
 
     def _buildTargetNetwork(self):
@@ -53,7 +64,8 @@ class Learner(LearnerInstance):
 
         pl = self.target_network[-1]
         self.target_network.append(NNLayer(pl.layer_size, self.num_outputs, tf.nn.tanh, pl.layer_output))
-        self.target_network_output = self.target_network[-1].layer_output
+        self.target_network_output = tf.stop_gradient(self.target_network[-1].layer_output)
+
 
     def _buildLearnNetwork(self):
         # learning network
@@ -79,39 +91,34 @@ class Learner(LearnerInstance):
 
         terminating_target = self.learn_network_reward
         intermediate_target = self.learn_network_reward + (tf.reduce_max(self.learn_network_successor_qvalues, axis=1) * self.reward_discount)
-        self.desired_output = tf.where(self.learn_network_terminal_mask, terminating_target, intermediate_target)
+        self.desired_output = tf.stop_gradient(
+            tf.where(self.learn_network_terminal_mask, terminating_target, intermediate_target))
 
         index_range = tf.constant(np.arange(self.max_batch_size), dtype=tf.int32)
         action_indices = tf.stack([index_range, self.learn_network_action_index], axis=1)
         self.indexed_output = tf.gather_nd(self.learn_network_output, action_indices)
 
-        self.filtered_loss = tf.squared_difference(self.desired_output, self.indexed_output)
-        self.learn_loss = tf.reduce_mean(self.filtered_loss)
-        self.learn_optimizer = tf.train.AdamOptimizer(self.learn_rate, beta1=0.99).minimize(self.learn_loss)
+        self.learn_loss = tf.losses.mean_squared_error(self.desired_output, self.indexed_output)
 
+        opt = tf.train.GradientDescentOptimizer(self.learn_rate)
+
+        vars_to_optimise = []
+        for ll in self.learn_network:
+            vars_to_optimise.append(ll.weights)
+            vars_to_optimise.append(ll.bias)
+
+        self.learn_optimizer = opt.minimize(self.learn_loss, var_list=vars_to_optimise, gate_gradients=2)
         self.update_ops = []
 
         assert (len(self.target_network) == len(self.learn_network))
         for i in range(len(self.target_network)):
             dst_weights = self.target_network[i].weights
-            src_weights = self.learn_network[i].weights
+            src_weights = tf.stop_gradient(self.learn_network[i].weights)
             self.update_ops.append(tf.assign(dst_weights, src_weights, validate_shape=True, use_locking=True))
 
             dst_bias = self.target_network[i].bias
-            src_bias = self.learn_network[i].bias
+            src_bias = tf.stop_gradient(self.learn_network[i].bias)
             self.update_ops.append(tf.assign(dst_bias, src_bias, validate_shape=True, use_locking=True))
-
-
-    def _buildGraph(self):
-        self.total_iters = 0
-        self.graph = tf.Graph()
-
-        with self.graph.as_default():
-            tf.set_random_seed(1)
-            self._buildTargetNetwork()
-            self._buildLearnNetwork()
-
-            self.init_op = tf.global_variables_initializer()
 
 
     def Learn(self, batch):

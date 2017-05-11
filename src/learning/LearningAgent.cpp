@@ -32,7 +32,7 @@ struct LearningAgent::LearningAgentImpl {
                              MOMENTS_BATCH_SIZE);
 
     learner = make_unique<python::TFLearner>(spec);
-    itersSinceTargetUpdated = 0;
+    itersSinceTargetUpdated = TARGET_FUNCTION_UPDATE_RATE + 1;
   }
 
   GameAction SelectAction(const GameState *state) {
