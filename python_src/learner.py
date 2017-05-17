@@ -3,25 +3,8 @@ from LearnerFramework import *
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
+import tensorflow.contrib.keras as keras
 import math
-
-
-class NNLayer:
-    def __init__(self, num_inputs, layer_size, activation_func, input_tensor):
-        self.num_inputs = num_inputs
-        self.layer_size = layer_size
-
-        init_range = 1.0 / self.num_inputs
-
-        self.weights = tf.Variable(
-            tf.random_uniform([self.num_inputs, self.layer_size], minval=-init_range, maxval=init_range),
-            dtype=tf.float32)
-
-        self.bias = tf.Variable(
-            tf.random_uniform([self.layer_size], minval=-init_range, maxval=init_range),
-            dtype=tf.float32)
-
-        self.layer_output = activation_func(tf.matmul(input_tensor, self.weights) + self.bias)
 
 
 class Learner(LearnerInstance):
@@ -32,6 +15,8 @@ class Learner(LearnerInstance):
         self.reward_discount = 1.0
 
         self.layer_sizes = [self.num_inputs, self.num_inputs / 2]
+
+        print 'BUILD GRAPH CALLED'
         self._buildGraph()
 
         self.sess = tf.Session(graph=self.graph)
@@ -54,17 +39,14 @@ class Learner(LearnerInstance):
         self.target_network_input = tf.placeholder(tf.float32, shape=(self.max_batch_size, self.num_inputs))
 
         self.target_network = []
-        for ls in self.layer_sizes:
-            if len(self.target_network) == 0:
-                self.target_network.append(
-                    NNLayer(self.num_inputs, ls, tf.nn.elu, self.target_network_input))
-            else:
-                pl = self.target_network[-1]
-                self.target_network.append(NNLayer(pl.layer_size, ls, tf.nn.elu, pl.layer_output))
+        feed_in_tensor = self.target_network_input
 
-        pl = self.target_network[-1]
-        self.target_network.append(NNLayer(pl.layer_size, self.num_outputs, tf.nn.tanh, pl.layer_output))
-        self.target_network_output = tf.stop_gradient(self.target_network[-1].layer_output)
+        for ls in self.layer_sizes:
+            self.target_network.append(keras.layers.Dense(units=ls, actvation=tf.nn.elu))
+            feed_in_tensor = self.target_network[-1].apply(feed_in_tensor)
+
+        self.target_network.append(keras.layers.Dense(units=self.num_outputs, actvation=tf.nn.tanh))
+        self.target_network_output = tf.stop_gradient(self.target_network[-1].apply(feed_in_tensor))
 
 
     def _buildLearnNetwork(self):
@@ -76,17 +58,14 @@ class Learner(LearnerInstance):
         self.learn_rate = tf.placeholder(tf.float32)
 
         self.learn_network = []
-        for ls in self.layer_sizes:
-            if len(self.learn_network) == 0:
-                self.learn_network.append(
-                    NNLayer(self.num_inputs, ls, tf.nn.elu, self.learn_network_input))
-            else:
-                pl = self.learn_network[-1]
-                self.learn_network.append(NNLayer(pl.layer_size, ls, tf.nn.elu, pl.layer_output))
+        feed_in_tensor = self.learn_network_input
 
-        pl = self.learn_network[-1]
-        self.learn_network.append(NNLayer(pl.layer_size, self.num_outputs, tf.nn.tanh, pl.layer_output))
-        self.learn_network_output = self.learn_network[-1].layer_output
+        for ls in self.layer_sizes:
+            self.learn_network.append(keras.layers.Dense(units=ls, actvation=tf.nn.elu))
+            feed_in_tensor = self.learn_network[-1].apply(feed_in_tensor)
+
+        self.learn_network.append(keras.layers.Dense(units=self.num_outputs, actvation=tf.nn.tanh))
+        self.learn_network_output = self.learn_network[-1].apply(feed_in_tensor)
 
         terminating_target = self.learn_network_reward
         intermediate_target = self.learn_network_reward + (tf.reduce_max(self.target_network_output, axis=1) * self.reward_discount)
@@ -111,13 +90,13 @@ class Learner(LearnerInstance):
         self.update_ops = []
         assert (len(self.target_network) == len(self.learn_network))
         for i in range(len(self.target_network)):
-            dst_weights = self.target_network[i].weights
-            src_weights = self.learn_network[i].weights
-            self.update_ops.append(tf.assign(dst_weights, src_weights, validate_shape=True, use_locking=True))
+            target_weights = self.target_network[i].trainable_weights()
+            learn_weights = self.learn_network[i].trainable_weights()
+            assert (len(target_weights) == len(learn_weights))
 
-            dst_bias = self.target_network[i].bias
-            src_bias = self.learn_network[i].bias
-            self.update_ops.append(tf.assign(dst_bias, src_bias, validate_shape=True, use_locking=True))
+            for j in range(len(target_weights)):
+                self.update_ops.append(
+                    tf.assign(target_weights[j], learn_weights[j], validate_shape=True, use_locking=True))
 
 
     def Learn(self, batch):
