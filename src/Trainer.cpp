@@ -106,8 +106,8 @@ struct Trainer::TrainerImpl {
             agent->SetPRandom(prand);
             // agent->SetTemperature(temp);
 
-            // this->playoutRoundVsSelf(agent, memory);
-            this->playoutRoundVsRandom(agent, memory);
+            this->playoutRoundVsSelf(agent, memory);
+            // this->playoutRoundVsRandom(agent, memory);
           }
         });
   }
@@ -139,24 +139,22 @@ struct Trainer::TrainerImpl {
 
   void playoutRoundVsSelf(LearningAgent *agent, ExperienceMemory *memory) {
     GameRules *rules = GameRules::Instance();
-    std::vector<PlayoutAgent> playoutAgents = {PlayoutAgent(agent, memory),
-                                               PlayoutAgent(agent, memory)};
 
     GameState initialState = rules->InitialState();
     EVector encodedInitialState = LearningAgent::EncodeGameState(&initialState);
 
     vector<GameState> curStates;
+    std::vector<PlayoutAgent> playoutAgents;
     for (unsigned i = 0; i < MOMENTS_BATCH_SIZE; i++) {
       curStates.emplace_back(generateStartState());
+      playoutAgents.emplace_back(PlayoutAgent(agent, memory));
+      playoutAgents.emplace_back(PlayoutAgent(agent, memory));
     }
 
     vector<bool> stateActive(curStates.size(), true);
 
     unsigned curPlayerIndex = 0;
     while (true) {
-      PlayoutAgent &curPlayer = playoutAgents[curPlayerIndex];
-      PlayoutAgent &otherPlayer = playoutAgents[(curPlayerIndex + 1) % 2];
-
       vector<pair<GameState *, EVector>> encodedStates;
       for (unsigned i = 0; i < curStates.size(); i++) {
         if (stateActive[i]) {
@@ -168,7 +166,7 @@ struct Trainer::TrainerImpl {
       }
 
       vector<GameAction> actions =
-          curPlayer.agent->SelectLearningActions(encodedStates);
+          agent->SelectLearningActions(encodedStates);
 
       unsigned numActiveStates = 0;
       for (unsigned i = 0; i < curStates.size(); i++) {
@@ -176,6 +174,9 @@ struct Trainer::TrainerImpl {
           continue;
         }
         numActiveStates++;
+
+        PlayoutAgent &curPlayer = playoutAgents[i * 2 + curPlayerIndex];
+        PlayoutAgent &otherPlayer = playoutAgents[i * 2 + (curPlayerIndex + 1) % 2];
 
         EVector encodedState = encodedStates[i].second;
         curPlayer.addTransitionToMemory(encodedState, 0.0f, false);

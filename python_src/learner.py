@@ -14,9 +14,7 @@ class Learner(LearnerInstance):
         self.max_batch_size = networkSpec.maxBatchSize
         self.reward_discount = 1.0
 
-        self.layer_sizes = [self.num_inputs, self.num_inputs / 2]
-
-        print 'BUILD GRAPH CALLED'
+        self.layer_sizes = [self.num_inputs * 2, self.num_inputs, self.num_inputs / 2]
         self._buildGraph()
 
         self.sess = tf.Session(graph=self.graph)
@@ -35,24 +33,47 @@ class Learner(LearnerInstance):
             self.init_op = tf.global_variables_initializer()
 
 
-    def _buildTargetNetwork(self):
-        self.target_network_input = tf.placeholder(tf.float32, shape=(self.max_batch_size, self.num_inputs))
+    def _buildNetwork(self, out_layers, in_tensor):
+        # feed_in_tensor = tf.reshape(in_tensor, [-1, 6, 7, 1])
+        #
+        # new_layer = keras.layers.Conv2D(
+        #     filters=16,
+        #     kernel_size=3,
+        #     activation=tf.nn.elu)
+        # new_layer.build(feed_in_tensor.shape)
+        # out_layers.append(new_layer)
+        # feed_in_tensor = new_layer.call(feed_in_tensor)
+        #
+        # new_layer = keras.layers.MaxPool2D()
+        # new_layer.build(feed_in_tensor.shape)
+        # out_layers.append(new_layer)
+        # feed_in_tensor = new_layer.call(feed_in_tensor)
+        #
+        # # flatten it
+        # size = int(feed_in_tensor.shape[1] * feed_in_tensor.shape[2] * feed_in_tensor.shape[3])
+        # feed_in_tensor = tf.reshape(feed_in_tensor, [-1, size])
 
-        self.target_network = []
-        feed_in_tensor = self.target_network_input
+        feed_in_tensor = in_tensor
 
         for ls in self.layer_sizes:
             new_layer = keras.layers.Dense(units=ls, activation=tf.nn.elu)
             new_layer.build(feed_in_tensor.shape)
+            out_layers.append(new_layer)
             feed_in_tensor = new_layer.call(feed_in_tensor)
-
-            self.target_network.append(new_layer)
 
         new_layer = keras.layers.Dense(units=self.num_outputs, activation=tf.nn.tanh)
         new_layer.build(feed_in_tensor.shape)
+        out_layers.append(new_layer)
 
-        self.target_network_output = tf.stop_gradient(new_layer.call(feed_in_tensor))
-        self.target_network.append(new_layer)
+        return new_layer.call(feed_in_tensor)
+
+
+    def _buildTargetNetwork(self):
+        self.target_network = []
+        self.target_network_input = tf.placeholder(tf.float32, shape=(self.max_batch_size, self.num_inputs))
+
+        output_tensor = self._buildNetwork(self.target_network, self.target_network_input)
+        self.target_network_output = tf.stop_gradient(output_tensor)
 
 
     def _buildLearnNetwork(self):
@@ -64,20 +85,7 @@ class Learner(LearnerInstance):
         self.learn_rate = tf.placeholder(tf.float32)
 
         self.learn_network = []
-        feed_in_tensor = self.learn_network_input
-
-        for ls in self.layer_sizes:
-            new_layer = keras.layers.Dense(units=ls, activation=tf.nn.elu)
-            new_layer.build(feed_in_tensor.shape)
-            feed_in_tensor = new_layer.call(feed_in_tensor)
-
-            self.learn_network.append(new_layer)
-
-        new_layer = keras.layers.Dense(units=self.num_outputs, activation=tf.nn.tanh)
-        new_layer.build(feed_in_tensor.shape)
-
-        self.learn_network_output = new_layer.call(feed_in_tensor)
-        self.learn_network.append(new_layer)
+        self.learn_network_output = self._buildNetwork(self.learn_network, self.learn_network_input)
 
         terminating_target = self.learn_network_reward
         intermediate_target = self.learn_network_reward + (tf.reduce_max(self.target_network_output, axis=1) * self.reward_discount)
@@ -90,12 +98,11 @@ class Learner(LearnerInstance):
 
         self.learn_loss = tf.losses.mean_squared_error(self.desired_output, self.indexed_output)
 
-        opt = tf.train.AdamOptimizer(self.learn_rate, beta1=0.99)
+        opt = tf.train.AdamOptimizer(self.learn_rate)
 
         vars_to_optimise = []
         for ll in self.learn_network:
-            vars_to_optimise.append(ll.weights)
-            vars_to_optimise.append(ll.bias)
+            vars_to_optimise.append(ll.trainable_weights)
 
         self.learn_optimizer = opt.minimize(self.learn_loss, var_list=vars_to_optimise)
 

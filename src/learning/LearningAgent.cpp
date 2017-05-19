@@ -27,7 +27,7 @@ struct LearningAgent::LearningAgentImpl {
       : pRandom(0.0f), temperature(0.0001f), ptctx(python::GlobalContext()) {
     python::PythonContextLock pl(ptctx);
 
-    python::NetworkSpec spec(BOARD_WIDTH * BOARD_HEIGHT * 2,
+    python::NetworkSpec spec(BOARD_WIDTH * BOARD_HEIGHT,
                              GameAction::ALL_ACTIONS().size(),
                              MOMENTS_BATCH_SIZE);
 
@@ -83,8 +83,8 @@ struct LearningAgent::LearningAgentImpl {
 
   python::QLearnBatch makeQBatch(const vector<ExperienceMoment> &moments,
                                  float learnRate) {
-    EMatrix initialStates(moments.size(), BOARD_WIDTH * BOARD_HEIGHT * 2);
-    EMatrix successorStates(moments.size(), BOARD_WIDTH * BOARD_HEIGHT * 2);
+    EMatrix initialStates(moments.size(), BOARD_WIDTH * BOARD_HEIGHT);
+    EMatrix successorStates(moments.size(), BOARD_WIDTH * BOARD_HEIGHT);
     std::vector<int> actionsTaken(moments.size());
     std::vector<bool> isEndStateTerminal(moments.size());
     std::vector<float> rewardsGained(moments.size());
@@ -127,7 +127,7 @@ struct LearningAgent::LearningAgentImpl {
   chooseBestActions(const vector<pair<GameState *, EVector>> &states) {
     assert(states.size() <= MOMENTS_BATCH_SIZE);
 
-    EMatrix encodedStates(states.size(), BOARD_WIDTH * BOARD_HEIGHT * 2);
+    EMatrix encodedStates(states.size(), BOARD_WIDTH * BOARD_HEIGHT);
     for (unsigned i = 0; i < states.size(); i++) {
       encodedStates.row(i) = states[i].second;
     }
@@ -183,25 +183,23 @@ struct LearningAgent::LearningAgentImpl {
 };
 
 EVector LearningAgent::EncodeGameState(const GameState *state) {
-  EVector result(2 * BOARD_WIDTH * BOARD_HEIGHT);
+  EVector result(BOARD_WIDTH * BOARD_HEIGHT);
   result.fill(0.0f);
 
   for (unsigned r = 0; r < BOARD_HEIGHT; r++) {
     for (unsigned c = 0; c < BOARD_WIDTH; c++) {
-      unsigned ri = 2 * (c + r * BOARD_WIDTH);
+      unsigned ri = (c + r * BOARD_WIDTH);
 
       switch (state->GetCell(r, c)) {
       case CellState::MY_TOKEN:
         result(ri) = 1.0f;
         break;
       case CellState::OPPONENT_TOKEN:
-        result(ri + 1) = 1.0f;
+        result(ri) = -1.0f;
         break;
       default:
         break;
       }
-
-      ri++;
     }
   }
 
