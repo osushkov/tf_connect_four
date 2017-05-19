@@ -42,11 +42,17 @@ class Learner(LearnerInstance):
         feed_in_tensor = self.target_network_input
 
         for ls in self.layer_sizes:
-            self.target_network.append(keras.layers.Dense(units=ls, actvation=tf.nn.elu))
-            feed_in_tensor = self.target_network[-1].apply(feed_in_tensor)
+            new_layer = keras.layers.Dense(units=ls, activation=tf.nn.elu)
+            new_layer.build(feed_in_tensor.shape)
+            feed_in_tensor = new_layer.call(feed_in_tensor)
 
-        self.target_network.append(keras.layers.Dense(units=self.num_outputs, actvation=tf.nn.tanh))
-        self.target_network_output = tf.stop_gradient(self.target_network[-1].apply(feed_in_tensor))
+            self.target_network.append(new_layer)
+
+        new_layer = keras.layers.Dense(units=self.num_outputs, activation=tf.nn.tanh)
+        new_layer.build(feed_in_tensor.shape)
+
+        self.target_network_output = tf.stop_gradient(new_layer.call(feed_in_tensor))
+        self.target_network.append(new_layer)
 
 
     def _buildLearnNetwork(self):
@@ -61,11 +67,17 @@ class Learner(LearnerInstance):
         feed_in_tensor = self.learn_network_input
 
         for ls in self.layer_sizes:
-            self.learn_network.append(keras.layers.Dense(units=ls, actvation=tf.nn.elu))
-            feed_in_tensor = self.learn_network[-1].apply(feed_in_tensor)
+            new_layer = keras.layers.Dense(units=ls, activation=tf.nn.elu)
+            new_layer.build(feed_in_tensor.shape)
+            feed_in_tensor = new_layer.call(feed_in_tensor)
 
-        self.learn_network.append(keras.layers.Dense(units=self.num_outputs, actvation=tf.nn.tanh))
-        self.learn_network_output = self.learn_network[-1].apply(feed_in_tensor)
+            self.learn_network.append(new_layer)
+
+        new_layer = keras.layers.Dense(units=self.num_outputs, activation=tf.nn.tanh)
+        new_layer.build(feed_in_tensor.shape)
+
+        self.learn_network_output = new_layer.call(feed_in_tensor)
+        self.learn_network.append(new_layer)
 
         terminating_target = self.learn_network_reward
         intermediate_target = self.learn_network_reward + (tf.reduce_max(self.target_network_output, axis=1) * self.reward_discount)
@@ -90,8 +102,8 @@ class Learner(LearnerInstance):
         self.update_ops = []
         assert (len(self.target_network) == len(self.learn_network))
         for i in range(len(self.target_network)):
-            target_weights = self.target_network[i].trainable_weights()
-            learn_weights = self.learn_network[i].trainable_weights()
+            target_weights = self.target_network[i].trainable_weights
+            learn_weights = self.learn_network[i].trainable_weights
             assert (len(target_weights) == len(learn_weights))
 
             for j in range(len(target_weights)):
